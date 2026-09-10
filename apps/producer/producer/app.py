@@ -18,7 +18,8 @@ from packages.ui_kit import theme as T
 from packages.ui_kit.components import app_header, kv, primary_button, screen, section_card, text_field
 from producer.export import build_label_payload, export_label
 
-OUT_DIR = Path("out")
+# cwd'den bağımsız: her zaman repo kökündeki out/ (.gitignore'da /out/)
+OUT_DIR = Path(__file__).resolve().parents[3] / "out"
 
 
 def build_view(page: ft.Page) -> ft.Control:

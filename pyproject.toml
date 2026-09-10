@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-producer = ["flet>=0.25"]
+ui = ["flet>=0.86,<0.90", "flet-desktop>=0.86,<0.90"]   # apps/producer + apps/consumer prototipleri
 dev = ["pytest>=8"]
 
 [tool.pytest.ini_options]

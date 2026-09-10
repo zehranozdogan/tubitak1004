@@ -1,5 +1,7 @@
 """Yeniden kullanılabilir UI parçaları (producer + consumer ortak)."""
 
+from __future__ import annotations
+
 import flet as ft
 
 from packages.ui_kit import theme as T
