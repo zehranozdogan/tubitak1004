@@ -1,0 +1,15 @@
+# QR Kod Tabanlı Akıllı Tazelik Sensörü — çekirdek bağımlılıklar
+segno>=1.6            # saf-python QR üretimi (packages/qr_layout)
+jsonschema>=4.20      # profil / layout / payload JSON doğrulama (packages/profile_schema)
+
+# apps/producer (arayüz) için — 0.86 ile test edildi:
+flet>=0.86
+flet-desktop>=0.86        # `flet run -w` bunu da ister (web modunda bile)
+
+# geliştirme:
+pytest>=8
+
+# İLERİDE (color-engine + tests/synthetic gerçek uygulaması):
+#   numpy, opencv-python veya scikit-image  -> homografi / ROI / renk
+#   pyzbar veya ikinci bir decoder          -> §11 Aşama A çift-decoder testi
+#   pillow                                  -> sentetik taze/geçiş/bozulma görselleri

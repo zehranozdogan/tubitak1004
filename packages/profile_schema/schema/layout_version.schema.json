@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tubitak1004/qr-freshness/layout_version.schema.json",
+  "title": "layout_version",
+  "description": "QR-sensor etiket geometrisi. Uretici ve okuyucu ayni geometriyi kullanir. Rapor §5, §8, §10.1. Okuyucu koordinatlari HARD-CODE ETMEZ; bu dosyadan okur.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["layout_version", "qr_version", "matrix_size", "sensor_modules", "reference_regions"],
+  "properties": {
+    "layout_version": {
+      "type": "string",
+      "description": "Ornek: QR_SENSOR_v4",
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "qr_version": { "type": "integer", "minimum": 1, "maximum": 40 },
+    "matrix_size": { "type": "integer", "description": "4*qr_version + 17" },
+    "ecc_level": { "type": "string", "enum": ["L", "M", "Q", "H"], "default": "H" },
+    "module_density": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Rapor §8: en az 3 dagitilmis layout adayi"
+    },
+    "sensor_modules": {
+      "type": "array",
+      "description": "Reaktif hucre koordinatlari [satir, sutun] (§6.3 sensor_modules)",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 2,
+        "maxItems": 2
+      }
+    },
+    "reference_regions": {
+      "type": "object",
+      "description": "Sabit, reaktif OLMAYAN referans noktalari (§6.1 kod: qr_fixed_regions).",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "intentional_errors": {
+      "type": "array",
+      "description": "Binary sinif degisimi kacinilmazsa kontrollu hata modulleri (§5.2/4).",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer" },
+        "minItems": 2,
+        "maxItems": 2
+      }
+    },
+    "decoder_check": {
+      "type": "object",
+      "description": "Rapor §5.2/6: her renk durumu >= 2 decoder ile okunmali.",
+      "additionalProperties": false,
+      "properties": {
+        "decoders": { "type": "array", "items": { "type": "string" } },
+        "color_states": { "type": "array", "items": { "type": "string" } },
+        "decode_success_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

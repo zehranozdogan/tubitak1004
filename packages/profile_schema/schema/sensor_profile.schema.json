@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tubitak1004/qr-freshness/sensor_profile.schema.json",
+  "title": "sensor_profile",
+  "description": "Sensor/renk skalasi surumu. Rapor §6.3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_id",
+    "analyte_axis",
+    "scale_points",
+    "calibration_method",
+    "output_fields"
+  ],
+  "properties": {
+    "profile_id": {
+      "type": "string",
+      "description": "Ornek: GENIPIN_PUTRESIN_v2",
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "analyte_axis": {
+      "type": "string",
+      "description": "Fiziksel referans ekseni",
+      "examples": ["pH", "putresin_mM", "custom"]
+    },
+    "scale_points": {
+      "type": "array",
+      "minItems": 2,
+      "description": "Referans renk noktalari ve varsa dogrulanmis sinif",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["value", "lab"],
+        "properties": {
+          "value": { "type": "number", "description": "analyte_axis uzerindeki deger" },
+          "rgb": {
+            "type": "array",
+            "items": { "type": "number", "minimum": 0, "maximum": 255 },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "lab": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "state": {
+            "type": ["string", "null"],
+            "description": "Dogrulanmis sinif; YOKSA null (rapor §7.2: sinif uydurma)",
+            "enum": ["fresh", "transition", "spoiled", null]
+          }
+        }
+      }
+    },
+    "calibration_method": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Rapor §6.1 yontem ailesi",
+          "enum": [
+            "white_black",
+            "white_gray_black",
+            "multicolor_patch",
+            "qr_fixed_regions",
+            "algorithmic_white_balance",
+            "learned"
+          ]
+        },
+        "params": { "type": "object" }
+      }
+    },
+    "class_thresholds": {
+      "type": ["object", "null"],
+      "description": "Bilimsel esik geldiginde doldurulur. YOKSA null => uygulama teknik seviye gosterir.",
+      "additionalProperties": false,
+      "properties": {
+        "fresh_max": { "type": "number" },
+        "transition_max": { "type": "number" },
+        "metric": { "type": "string", "examples": ["CIEDE2000", "delta_e_76"] }
+      }
+    },
+    "quality_gate": {
+      "type": "object",
+      "description": "Dusuk kalitede sinif uretme, 'Yeniden tara' don (§6.2/8, §7.1).",
+      "additionalProperties": false,
+      "properties": {
+        "min_quality_score": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5 }
+      }
+    },
+    "output_fields": {
+      "type": "array",
+      "description": "UI'da gosterilebilecek ciktilar (§6.3)",
+      "items": {
+        "type": "string",
+        "enum": [
+          "state",
+          "analyte",
+          "confidence",
+          "delta_e",
+          "technical_level",
+          "estimated_ph",
+          "estimated_amine",
+          "freshness_percent",
+          "shelf_life_days"
+        ]
+      }
+    }
+  }
+}

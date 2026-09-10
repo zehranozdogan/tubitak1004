@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# Üretilen çıktılar (etiketler, layout JSON, sentetik görseller)
+/out/
+*.apk
+*.aab
+
+# Flet build
+build/
+dist/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Cihaz test logları ham (özet CSV commit'lenir)
+/tests/device/raw/
+
+# Flet
+.flet/

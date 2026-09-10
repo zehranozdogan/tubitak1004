@@ -1,1 +1,79 @@
-# tubitak1004
+# QR Kod Tabanlı Akıllı Tazelik Sensörü
+
+Balık ambalajında bozulmayla ilişkili uçucu aminler ve pH değişimi nedeniyle renk
+değiştiren **kolorimetrik sensör yüzeyi + QR** etiketini standart bir telefon
+kamerasıyla okuyup renk değişimini **nicel** ölçen ve kullanıcıya anlaşılır bir
+tazelik sonucu (yoksa teknik renk seviyesi) veren **uçtan uca** prototip.
+
+> Yapı ve kararlar **Öğrenci Teknik Devir Raporu**'na (10 Eylül 2026) göredir.
+> Bu, eski uygulamanın devamı değildir — temiz repo, sıfırdan sistem (§2).
+
+## Yapı (Rapor §3.2)
+
+```
+apps/
+  producer/     Üretici / etiket oluşturma — Flet masaüstü (çalışır)
+  consumer/     Tüketici — UX prototipi (Flet-web, login+admin+user). Gerçek app: Flutter (docs/decisions/0002)
+packages/
+  qr_layout/        Standart QR + fonksiyon maskesi + DAĞITILMIŞ reaktif modül (§5)
+  color_engine/     Kalibrasyon + ROI + Lab/ΔE + profil eşleştirme (§6) — iskelet
+  profile_schema/   sensor_profile / layout_version / label_payload JSON şemaları (§6.3, §10.1)
+  ui_kit/           Flet prototip arayüzleri için ortak tasarım (producer + consumer)
+tests/
+  synthetic/    QR / şema / motor birim testleri (§11 Aşama A çekirdeği)
+  device/       Telefon / ışık / mesafe / açı test protokolü (§11 Aşama B)
+docs/           Mimari, veri sözleşmesi, ekip planı, kararlar
+```
+
+**Ortak motor kuralı:** koordinat / eşik / kalibrasyon parametreleri koda gömülmez;
+`packages/profile_schema` dosyalarından okunur. Okuyucu koordinat hard-code etmez (§10.2).
+
+## Kurulum
+
+```bash
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+pytest                              # tests/synthetic
+flet run apps/producer/main.py      # üretici arayüzü (masaüstü)
+```
+
+## İş bölümü (Rapor §9)
+
+| | Klasör |
+|---|---|
+| **Öğrenci 1** (teknik lider) | `apps/producer`, `apps/consumer`, `packages/qr_layout`, `packages/profile_schema`, entegrasyon |
+| **Öğrenci 2** (algoritma/doğrulama) | `packages/color_engine`, `tests/device`, kalibrasyon benchmark |
+| **Ortak** (iki onay) | `packages/qr_layout/reactive.py`, `tests/synthetic`, `docs/`, `pyproject.toml` |
+
+Detay: [docs/team.md](docs/team.md) · Git akışı: `main` korumalı, yardımcı PR açar, teknik lider merge.
+
+## Şu an ne çalışıyor
+
+- ✅ `packages/qr_layout`: QR üretimi, ISO/IEC 18004 fonksiyon maskesi, reaktif aday
+  havuzu, mekânsal dağıtılmış modül seçimi (basit sürüm), `layout_version` JSON
+- ✅ `packages/profile_schema`: 3 JSON şeması + örnekler + doğrulamalı yükleyici
+- ✅ `apps/producer`: form → `label_payload` + `layout_version` + PNG/PDF/JSON `out/`
+- ✅ `tests/synthetic`: QR/şema/motor testleri
+- 🚧 `packages/color_engine`: sözleşme + akış iskeleti; gerçek görüntü işleme TODO
+- 🚧 `apps/consumer`: Flet-web UX prototipi (login + admin + user iskeleti) çalışır;
+  gerçek uygulama framework'ü **Flutter** yönelimli, spike ile kesinleşir
+  ([docs/decisions/0002](docs/decisions/0002-framework-spike.md))
+
+## Açık kararlar
+
+- **Framework** (tüketici): React Native / Flutter / native — Hafta-1 spike ([0002](docs/decisions/0002-framework-spike.md))
+- **Kalibrasyon yöntemi**: §6.1 A–E karşılaştırması → `packages/color_engine/calibration.py`
+- **Reaktif modül algoritması**: `packages/qr_layout/reactive.py` başlığındaki TODO listesi
+- **Tazelik eşikleri**: bilimsel ground-truth gelene kadar `class_thresholds: null` → teknik seviye gösterilir (§7.2)
+
+## Kapsam dışı (§13)
+
+Kullanıcı hesabı / login, bulut veritabanı, ERP, çoklu fabrika, mağaza paneli,
+blockchain, ödeme, app-store yayını.
+
+## Kaynaklar
+
+Onaylı proje dosyası: *Su Ürünlerinin Tazeliğinin Takibine Yönelik QR Kod Tabanlı
+Akıllı Ambalaj Etiketi Geliştirilmesi* (TÜBİTAK 1004). Ayrıca Benito-Altamirano ve
+ark. (2023/2024) back-compatible color QR çalışmaları; ColorSensing yaklaşımı.

@@ -1,0 +1,17 @@
+[project]
+name = "qr-freshness"
+version = "0.1.0"
+description = "QR Kod Tabanli Akilli Tazelik Sensoru - uctan uca prototip (uretici + tuketici + ortak motor paketleri)"
+requires-python = ">=3.10"
+dependencies = [
+    "segno>=1.6",
+    "jsonschema>=4.20",
+]
+
+[project.optional-dependencies]
+producer = ["flet>=0.25"]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

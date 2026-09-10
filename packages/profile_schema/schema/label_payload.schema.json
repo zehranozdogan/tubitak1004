@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tubitak1004/qr-freshness/label_payload.schema.json",
+  "title": "label_payload",
+  "description": "QR icine gomulen makine-okur icerik. Rapor §10.1 ortak veri sozlesmesi.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["product_id", "product_type", "production_date", "sensor_profile_id", "layout_version"],
+  "properties": {
+    "product_id": { "type": "string", "description": "Parti / lot no, ornek: TR45678" },
+    "product_type": { "type": "string", "examples": ["LEVREK", "CIPURA"] },
+    "production_date": { "type": "string", "format": "date", "description": "YYYY-MM-DD" },
+    "sensor_profile_id": { "type": "string", "description": "sensor_profile.profile_id" },
+    "layout_version": { "type": "string", "description": "layout_version.layout_version" },
+    "profile_uri": {
+      "type": "string",
+      "description": "Opsiyonel: profil/layout JSON'a erisim (paket, url veya gomulu)"
+    }
+  }
+}

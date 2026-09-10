@@ -1,0 +1,22 @@
+# Klasör sahiplikleri (Öğrenci Teknik Devir Raporu §9). GitHub kullanıcı adlarını
+# doldurup satır başındaki # işaretini kaldırın.
+
+# Öğrenci 1 — ana sorumlu / teknik lider (§9.1):
+#   QR layout motoru, üretici modülü, tüketici uygulaması, uçtan uca entegrasyon,
+#   veri sözleşmesi, merge/release
+# /apps/producer/                @ogrenci-1
+# /apps/consumer/                @ogrenci-1
+# /packages/qr_layout/           @ogrenci-1
+# /packages/profile_schema/      @ogrenci-1
+# /docs/data-contract.md         @ogrenci-1
+
+# Öğrenci 2 — yardımcı / algoritma ve doğrulama (§9.2):
+#   kalibrasyon karşılaştırması, homografi/ROI/Lab/ΔE, kalite skoru, cihaz testleri
+# /packages/color_engine/        @ogrenci-2
+# /tests/device/                 @ogrenci-2
+
+# Ortak — iki onay gerekir:
+# /packages/qr_layout/reactive.py   @ogrenci-1 @ogrenci-2
+# /tests/synthetic/                 @ogrenci-1 @ogrenci-2
+# /docs/                            @ogrenci-1 @ogrenci-2
+# /pyproject.toml                   @ogrenci-1 @ogrenci-2

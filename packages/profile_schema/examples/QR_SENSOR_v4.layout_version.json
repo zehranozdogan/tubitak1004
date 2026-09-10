@@ -1,0 +1,21 @@
+{
+  "layout_version": "QR_SENSOR_v4",
+  "qr_version": 4,
+  "matrix_size": 33,
+  "ecc_level": "H",
+  "module_density": "low",
+  "sensor_modules": [
+    [10, 12], [10, 20], [12, 26], [16, 10], [16, 22],
+    [20, 16], [22, 28], [26, 12], [26, 22], [28, 18]
+  ],
+  "reference_regions": {
+    "white": [[9, 9], [9, 10]],
+    "black": [[24, 23], [24, 24]]
+  },
+  "intentional_errors": [],
+  "decoder_check": {
+    "decoders": ["zxing", "quirc"],
+    "color_states": ["fresh", "transition", "spoiled"],
+    "decode_success_rate": 0.0
+  }
+}
