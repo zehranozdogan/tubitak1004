@@ -22,7 +22,13 @@ from producer.export import build_label_payload, export_label
 OUT_DIR = Path(__file__).resolve().parents[3] / "out"
 
 
-def build_view(page: ft.Page) -> ft.Control:
+def build_form(page: ft.Page) -> list[ft.Control]:
+    """Etiket oluşturma kartları (form + önizleme + not).
+
+    Bağımsız `apps/producer` çalıştırıldığında `build_view` bunu kendi başlığıyla
+    sarar; `apps/consumer` "Yönetici" ekranı da AYNI fonksiyonu kendi başlığıyla
+    sarıp gösterir (tek kod, iki giriş noktası).
+    """
     product_type = text_field("Ürün türü", "LEVREK")
     product_id = text_field("Parti / Lot no", "TR45678")
     production_date = text_field("Üretim tarihi (YYYY-AA-GG)", date.today().isoformat())
@@ -131,4 +137,9 @@ def build_view(page: ft.Page) -> ft.Control:
         ),
     )
 
-    return screen(app_header("Üretici — Etiket Oluşturma"), form, preview_card, note)
+    return [form, preview_card, note]
+
+
+def build_view(page: ft.Page) -> ft.Control:
+    """Bağımsız çalıştırma için tam ekran (flet run apps/producer/main.py)."""
+    return screen(app_header("Üretici — Etiket Oluşturma"), *build_form(page))
