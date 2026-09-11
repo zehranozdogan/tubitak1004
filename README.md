@@ -57,7 +57,10 @@ Detay: [docs/team.md](docs/team.md) · Git akışı: `main` korumalı, yardımc�
 - ✅ `packages/profile_schema`: 3 JSON şeması + örnekler + doğrulamalı yükleyici
 - ✅ `packages/label_export` + **Yönetici** ekranı (`apps/consumer`): form →
   `label_payload` + `layout_version` + PNG/PDF/JSON `out/`
-- ✅ `tests/synthetic`: QR/şema/motor testleri
+- ✅ `packages/qr_layout/render.py`: reaktif hücrelerin **renkli** gösterimi
+  (Pillow) — taze/geçiş/bozuk sentetik görseller; her modül kendi açık/koyu
+  sınıfını korur (§5.2), QR okunabilirliği bozulmaz
+- ✅ `tests/synthetic`: QR/şema/motor/render testleri
 - 🚧 `packages/color_engine`: sözleşme + akış iskeleti; gerçek görüntü işleme TODO
 - 🚧 `apps/consumer` **Kullanıcı** ekranı: iskelet, doldurulacak; gerçek tüketici
   uygulamasının framework'ü **Flutter** yönelimli, spike ile kesinleşir

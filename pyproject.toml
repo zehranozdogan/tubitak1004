@@ -6,6 +6,7 @@ requires-python = ">=3.10"
 dependencies = [
     "segno>=1.6",
     "jsonschema>=4.20",
+    "Pillow>=10",
 ]
 
 [project.optional-dependencies]
