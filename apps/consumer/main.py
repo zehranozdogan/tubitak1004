@@ -8,13 +8,10 @@
 import sys
 from pathlib import Path
 
-# repo kökü + app dizini + üretici dizini path'e -> `packages/`, `consumer/`,
-# `producer/` her yerden import edilir. "Yönetici" ekranı üretici formunu
-# (apps/producer/producer/app.py::build_form) doğrudan kullanır.
+# repo kökü + app dizini path'e -> `packages/` ve `consumer/` her yerden import edilir
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _APP_DIR = Path(__file__).resolve().parent
-_PRODUCER_DIR = _REPO_ROOT / "apps" / "producer"
-for _p in (str(_REPO_ROOT), str(_APP_DIR), str(_PRODUCER_DIR)):
+for _p in (str(_REPO_ROOT), str(_APP_DIR)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 

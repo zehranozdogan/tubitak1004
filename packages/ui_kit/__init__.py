@@ -1,8 +1,8 @@
-"""ui_kit — Flet prototip arayüzleri için ortak tasarım sistemi.
+"""ui_kit — Flet prototipi için ortak tasarım sistemi.
 
-apps/producer ve apps/consumer (Flet prototipi) bunu kullanır. Gerçek tüketici
-uygulaması Flutter/native olacağından bu paket yalnızca prototip/masaüstü içindir
-(bkz. docs/decisions/0002-framework-spike.md).
+apps/consumer (Flet prototipi: login + Yönetici + Kullanıcı) bunu kullanır.
+Gerçek tüketici uygulaması Flutter/native olacağından bu paket yalnızca
+prototip içindir (bkz. docs/decisions/0002-framework-spike.md).
 """
 
 from packages.ui_kit import theme

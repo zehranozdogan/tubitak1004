@@ -1,4 +1,4 @@
-"""Yeniden kullanılabilir UI parçaları (producer + consumer ortak)."""
+"""Yeniden kullanılabilir UI parçaları (apps/consumer prototipi için)."""
 
 from __future__ import annotations
 

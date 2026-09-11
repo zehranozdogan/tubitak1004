@@ -4,8 +4,10 @@
 
 1. **Sensör / referans girdileri** — fiziksel sensör davranışı, renk skalası, örnek
    fotoğraflar, profile aktarılacak referans değerler.
-2. **Üretici / etiket oluşturma** (`apps/producer`) — ürün + parti + sensör profili +
-   QR layout sürümünden basılabilir etiket üretir.
+2. **Üretici / etiket oluşturma** (`apps/consumer` → Yönetici ekranı, iş mantığı
+   `packages/label_export`) — ürün + parti + sensör profili + QR layout
+   sürümünden basılabilir etiket üretir. Ayrı bir üretici uygulaması yok; iş
+   mantığı framework'ten bağımsız bir pakette olduğu için gerekirse eklenebilir.
 3. **Fiziksel akıllı etiket** — standart QR fonksiyon alanları korunur; seçilmiş
    data/ECC modüllerinde **dağıtılmış** reaktif renk hücreleri + sabit kalibrasyon
    referansları.
@@ -24,14 +26,22 @@ QR tespiti → homografi/hizalama → kalibrasyon → sensör ROI örnekleme
 
 | Rapor önerisi | Bu repo |
 |---|---|
-| `/apps/producer` | `apps/producer/` (Flet masaüstü) |
-| `/apps/consumer` | `apps/consumer/` (framework spike sonrası — [0002](decisions/0002-framework-spike.md)) |
+| `/apps/producer` | Yok — Yönetici ekranı olarak `apps/consumer/` içine gömülü (aşağıya bakın) |
+| `/apps/consumer` | `apps/consumer/` — tek çalışan uygulama (Flet prototip; gerçek framework spike sonrası — [0002](decisions/0002-framework-spike.md)) |
 | `/packages/qr-layout` | `packages/qr_layout/` — QR üretimi + fonksiyon maskesi + reaktif modül |
 | `/packages/color-engine` | `packages/color_engine/` — kalibrasyon + ROI + eşleştirme (iskelet) |
 | `/packages/profile-schema` | `packages/profile_schema/` — sensor_profile / layout_version / label_payload JSON şemaları |
+| — | `packages/label_export/` — etiket paketi üretimi (§8), framework'ten bağımsız |
+| — | `packages/ui_kit/` — Flet prototipi için ortak tasarım |
 | `/tests/synthetic` | `tests/synthetic/` — QR/şema/motor birim testleri |
 | `/tests/device` | `tests/device/` — telefon/ışık/mesafe/açı protokolü |
 | `/docs` | `docs/` |
+
+**Neden ayrı üretici uygulaması yok:** iki öğrenci şu an tek bir Flet prototipi
+üzerinden çalışıyor (login → Yönetici / Kullanıcı). Etiket üretim mantığı
+(`packages/label_export`) framework'ten bağımsız olduğu için ayrı bir üretici
+uygulaması istenirse — ör. gerçek tüketici Flutter'a geçtiğinde — kolayca
+eklenebilir; bu bir mimari kayıp değil.
 
 **Ortak motor kuralı:** veri modeli, QR-layout motoru ve renk motoru `packages/`
 altında paylaşılır; `apps/` bunları tüketir. Koordinat / eşik / kalibrasyon
