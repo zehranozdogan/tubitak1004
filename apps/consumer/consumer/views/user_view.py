@@ -1,7 +1,7 @@
 """Kullanıcı sayfası — tarama + sonuç akışı (rapor §7).
 
-Akış: Tarama ekranı (kamera henüz yok, buton simüle eder) → Yükleniyor →
-Sonuç ekranı. Veri şimdilik mock; gerçek entegrasyonda `_run_scan` içindeki
+Akış: Tarama ekranı (kamera henüz yok, buton simüle eder) → Sonuç ekranı.
+Veri şimdilik mock; gerçek entegrasyonda `_run_scan` içindeki
 mock sonuç yerine `packages.color_engine.pipeline.analyze()` çağrılacak —
 ColorEngineResult şekli burada da kullanılıyor ki geçiş kod değişikliği
 gerektirmesin.
@@ -15,8 +15,6 @@ Sonuç ekranı kuralı (§7.2, kritik):
 
 from __future__ import annotations
 
-import asyncio
-
 import flet as ft
 
 from packages.color_engine.types import ColorEngineResult
@@ -26,6 +24,7 @@ from packages.ui_kit.components import app_header, kv, screen, section_card
 _MOCK_LABEL_INFO = {
     "product_type": "Levrek",
     "product_id": "TR45678",
+    "production_date": "10.09.2026",
 }
 
 _MOCK_OK = ColorEngineResult(
@@ -90,9 +89,6 @@ def user_body(page: ft.Page, nav) -> ft.Control:
         page.update()
 
     async def _run_scan(result: ColorEngineResult) -> None:
-        body.controls = [_loading_view()]
-        page.update()
-        await asyncio.sleep(1.0)  # kamera + color_engine gecikmesini simüle eder
         body.controls = [_result_view(page, result, on_rescan=show_scan)]
         page.update()
 
@@ -182,18 +178,6 @@ def _scan_view(on_scan, test_scenarios) -> ft.Control:
                 "Son okumalar",
                 ft.Text("Henüz okuma yok.", color=T.C_MUTED, size=T.T_BODY),
             ),
-        ],
-    )
-
-
-def _loading_view() -> ft.Control:
-    return ft.Column(
-        spacing=T.GAP_M,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        controls=[
-            ft.Container(height=T.GAP_L),
-            ft.ProgressRing(),
-            ft.Text("Taranıyor…", size=T.T_BODY, color=T.C_MUTED),
         ],
     )
 
@@ -310,6 +294,7 @@ def _result_view(page: ft.Page, result: ColorEngineResult, on_rescan) -> ft.Cont
                 ft.Row([headline], alignment=ft.MainAxisAlignment.CENTER),
                 kv("Ürün", _MOCK_LABEL_INFO["product_type"]),
                 kv("Parti", _MOCK_LABEL_INFO["product_id"]),
+                kv("Üretim tarihi", _MOCK_LABEL_INFO["production_date"]),
                 kv("Okuma kalitesi", "Uygun"),
             ),
             ft.Row([details_button], alignment=ft.MainAxisAlignment.CENTER),
