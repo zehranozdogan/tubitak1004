@@ -6,10 +6,11 @@ requires-python = ">=3.10"
 dependencies = [
     "segno>=1.6",
     "jsonschema>=4.20",
+    "Pillow>=10",
 ]
 
 [project.optional-dependencies]
-ui = ["flet>=0.86,<0.90", "flet-desktop>=0.86,<0.90"]   # apps/producer + apps/consumer prototipleri
+ui = ["flet>=0.86,<0.90", "flet-desktop>=0.86,<0.90"]   # apps/consumer prototipi
 dev = ["pytest>=8"]
 
 [tool.pytest.ini_options]

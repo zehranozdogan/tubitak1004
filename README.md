@@ -12,13 +12,15 @@ tazelik sonucu (yoksa teknik renk seviyesi) veren **uçtan uca** prototip.
 
 ```
 apps/
-  producer/     Üretici / etiket oluşturma — Flet masaüstü (çalışır)
-  consumer/     Tüketici — UX prototipi (Flet-web, login+admin+user). Gerçek app: Flutter (docs/decisions/0002)
+  consumer/     Tek çalışan uygulama (Flet-web prototip):
+                login (parolasız) → Yönetici (etiket oluşturma, §8) / Kullanıcı (iskelet)
+                Gerçek tüketici app'i: Flutter (docs/decisions/0002)
 packages/
   qr_layout/        Standart QR + fonksiyon maskesi + DAĞITILMIŞ reaktif modül (§5)
   color_engine/     Kalibrasyon + ROI + Lab/ΔE + profil eşleştirme (§6) — iskelet
   profile_schema/   sensor_profile / layout_version / label_payload JSON şemaları (§6.3, §10.1)
-  ui_kit/           Flet prototip arayüzleri için ortak tasarım (producer + consumer)
+  label_export/     Etiket paketi üretimi (§8) — framework'ten bağımsız iş mantığı
+  ui_kit/           Flet prototipi için ortak tasarım sistemi
 tests/
   synthetic/    QR / şema / motor birim testleri (§11 Aşama A çekirdeği)
   device/       Telefon / ışık / mesafe / açı test protokolü (§11 Aşama B)
@@ -34,17 +36,17 @@ docs/           Mimari, veri sözleşmesi, ekip planı, kararlar
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-pytest                              # tests/synthetic
-flet run apps/producer/main.py      # üretici arayüzü (masaüstü)
+pytest                                # tests/synthetic
+flet run -w apps/consumer/main.py     # tek uygulama, tarayıcıda (localhost) açılır
 ```
 
 ## İş bölümü (Rapor §9)
 
 | | Klasör |
 |---|---|
-| **Öğrenci 1** (teknik lider) | `apps/producer`, `apps/consumer`, `packages/qr_layout`, `packages/profile_schema`, entegrasyon |
+| **Öğrenci 1** (teknik lider) | `apps/consumer`, `packages/qr_layout`, `packages/profile_schema`, `packages/label_export`, entegrasyon |
 | **Öğrenci 2** (algoritma/doğrulama) | `packages/color_engine`, `tests/device`, kalibrasyon benchmark |
-| **Ortak** (iki onay) | `packages/qr_layout/reactive.py`, `tests/synthetic`, `docs/`, `pyproject.toml` |
+| **Ortak** (iki onay) | `packages/qr_layout/reactive.py`, `packages/ui_kit`, `tests/synthetic`, `docs/`, `pyproject.toml` |
 
 Detay: [docs/team.md](docs/team.md) · Git akışı: `main` korumalı, yardımcı PR açar, teknik lider merge.
 
@@ -53,11 +55,15 @@ Detay: [docs/team.md](docs/team.md) · Git akışı: `main` korumalı, yardımc�
 - ✅ `packages/qr_layout`: QR üretimi, ISO/IEC 18004 fonksiyon maskesi, reaktif aday
   havuzu, mekânsal dağıtılmış modül seçimi (basit sürüm), `layout_version` JSON
 - ✅ `packages/profile_schema`: 3 JSON şeması + örnekler + doğrulamalı yükleyici
-- ✅ `apps/producer`: form → `label_payload` + `layout_version` + PNG/PDF/JSON `out/`
-- ✅ `tests/synthetic`: QR/şema/motor testleri
+- ✅ `packages/label_export` + **Yönetici** ekranı (`apps/consumer`): form →
+  `label_payload` + `layout_version` + PNG/PDF/JSON `out/`
+- ✅ `packages/qr_layout/render.py`: reaktif hücrelerin **renkli** gösterimi
+  (Pillow) — taze/geçiş/bozuk sentetik görseller; her modül kendi açık/koyu
+  sınıfını korur (§5.2), QR okunabilirliği bozulmaz
+- ✅ `tests/synthetic`: QR/şema/motor/render testleri
 - 🚧 `packages/color_engine`: sözleşme + akış iskeleti; gerçek görüntü işleme TODO
-- 🚧 `apps/consumer`: Flet-web UX prototipi (login + admin + user iskeleti) çalışır;
-  gerçek uygulama framework'ü **Flutter** yönelimli, spike ile kesinleşir
+- 🚧 `apps/consumer` **Kullanıcı** ekranı: iskelet, doldurulacak; gerçek tüketici
+  uygulamasının framework'ü **Flutter** yönelimli, spike ile kesinleşir
   ([docs/decisions/0002](docs/decisions/0002-framework-spike.md))
 
 ## Açık kararlar

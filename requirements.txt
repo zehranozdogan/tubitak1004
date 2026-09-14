@@ -1,6 +1,7 @@
 # QR Kod Tabanlı Akıllı Tazelik Sensörü — çekirdek bağımlılıklar
 segno>=1.6            # saf-python QR üretimi (packages/qr_layout)
 jsonschema>=4.20      # profil / layout / payload JSON doğrulama (packages/profile_schema)
+Pillow>=10             # reaktif hücrelerin renkli/sentetik render'ı (packages/qr_layout/render.py)
 
 # apps/producer + apps/consumer (Flet prototipleri) — 0.86 ile test edildi.
 # 0.90'da API kırılımları var; üst sınır bilinçli.

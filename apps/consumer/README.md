@@ -17,7 +17,8 @@ Karar 1. hafta spike ile kesinleşir; **yönelim Flutter**. Ayrıntı ve gerekç
 
 Şu an burada **UX prototipi** var: iki öğrencinin `localhost`'tan tasarımı görüp
 netleştirmesi için. Gerçek uygulama Flutter/native ile yazılacak; ortak
-`packages/` (qr_layout, color_engine, profile_schema) framework'ten bağımsız kalır.
+`packages/` (qr_layout, color_engine, profile_schema, label_export) framework'ten
+bağımsız kalır — yalnızca `ui_kit` Flet'e özeldir ve bu prototipe aittir.
 
 ### Çalıştırma (arkadaşın da yapacağı)
 
@@ -40,12 +41,16 @@ Routing yok (Flet 0.86 uyumu): tek sayfa, içerik değişimi (`consumer/app.py` 
 | Ekran | Dosya | Ne |
 |---|---|---|
 | Giriş | `consumer/views/login_view.py` | Parola yok; **Yönetici** / **Kullanıcı** kutucuğu → ilgili ekran |
-| Yönetici | `consumer/views/admin_view.py` | Basit panel — yüklü profil/sürüm bilgisi (dosyadan okunur) |
+| Yönetici | `consumer/views/admin_view.py` | Etiket oluşturma formu (rapor §8) — `packages/label_export` ile QR/PNG/PDF üretir |
 | Kullanıcı | `consumer/views/user_view.py` | **İSKELET** — arkadaş bunu geliştirecek |
+
+> Not: Ayrı bir üretici uygulaması yok — tek çalışan uygulama budur. Etiket
+> üretim mantığı framework'ten bağımsız bir pakette (`packages/label_export`)
+> olduğu için ileride ayrı bir üretici arayüzü gerekirse kolayca eklenir.
 
 ### Arkadaş için
 
-- Tasarım sistemi (producer ile ORTAK): [`packages/ui_kit/theme.py`](../../packages/ui_kit/theme.py)
+- Tasarım sistemi: [`packages/ui_kit/theme.py`](../../packages/ui_kit/theme.py)
   (renk/boşluk/yazı — çıplak sayı kullanma)
 - Hazır bileşenler: [`packages/ui_kit/components.py`](../../packages/ui_kit/components.py) —
   `screen`, `app_header`, `section_card`, `kv`, `stat_card`, `nav_tile`, `text_field`, `primary_button`
