@@ -80,6 +80,17 @@ _FRESHNESS_COLORS = {
     "spoiled": T.C_SPOILED,
 }
 
+# Mock — ileride bir veritabanından (okuma geçmişi tablosu) çekilecek.
+# Şimdilik sabit örnek veri; freshness_class -> etiket/renk _FRESHNESS_LABELS
+# ve _FRESHNESS_COLORS'tan türetilir (tek kaynak, sonuç ekranıyla tutarlı).
+_MOCK_RECENT_READS = [
+    {"product": "Levrek", "product_id": "TR45678", "when": "14.09.2026 09:12", "freshness_class": "fresh"},
+    {"product": "Levrek", "product_id": "TR45678", "when": "13.09.2026 18:47", "freshness_class": "transition"},
+    {"product": "Çupra", "product_id": "TR45521", "when": "12.09.2026 11:03", "freshness_class": "fresh"},
+    {"product": "Levrek", "product_id": "TR45678", "when": "11.09.2026 16:30", "freshness_class": "spoiled"},
+    {"product": "Somon", "product_id": "TR44210", "when": "10.09.2026 08:55", "freshness_class": "fresh"},
+]
+
 
 def user_body(page: ft.Page, nav) -> ft.Control:
     body = ft.Column(spacing=T.GAP_M)
@@ -135,6 +146,52 @@ def user_body(page: ft.Page, nav) -> ft.Control:
     return screen(app_header("Tazelik", on_back=nav.login), body)
 
 
+def _recent_read_row(entry: dict) -> ft.Control:
+    freshness_class = entry["freshness_class"]
+    label = _FRESHNESS_LABELS[freshness_class]
+    color = _FRESHNESS_COLORS[freshness_class]
+    return ft.Row(
+        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        controls=[
+            ft.Row(
+                spacing=T.GAP_S,
+                controls=[
+                    ft.Container(width=10, height=10, border_radius=999, bgcolor=color),
+                    ft.Column(
+                        spacing=0,
+                        controls=[
+                            ft.Text(
+                                f'{entry["product"]} · {entry["product_id"]}',
+                                size=T.T_BODY,
+                                weight=ft.FontWeight.W_500,
+                            ),
+                            ft.Text(entry["when"], size=T.T_CAPTION, color=T.C_MUTED),
+                        ],
+                    ),
+                ],
+            ),
+            ft.Text(label, size=T.T_CAPTION, weight=ft.FontWeight.W_600, color=color),
+        ],
+    )
+
+
+def _recent_reads_card() -> ft.Control:
+    if not _MOCK_RECENT_READS:
+        return section_card(
+            "Son okumalar",
+            ft.Text("Henüz okuma yok.", color=T.C_MUTED, size=T.T_BODY),
+        )
+
+    rows: list[ft.Control] = []
+    for i, entry in enumerate(_MOCK_RECENT_READS):
+        if i > 0:
+            rows.append(ft.Divider(height=1, color=T.C_OUTLINE))
+        rows.append(_recent_read_row(entry))
+
+    return section_card("Son okumalar", *rows)
+
+
 def _scan_view(on_scan, test_scenarios) -> ft.Control:
     viewfinder = ft.Container(
         height=220,
@@ -182,10 +239,7 @@ def _scan_view(on_scan, test_scenarios) -> ft.Control:
                 ),
                 test_buttons,
             ),
-            section_card(
-                "Son okumalar",
-                ft.Text("Henüz okuma yok.", color=T.C_MUTED, size=T.T_BODY),
-            ),
+            _recent_reads_card(),
         ],
     )
 
