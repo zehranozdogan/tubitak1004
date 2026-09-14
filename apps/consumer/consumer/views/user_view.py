@@ -79,6 +79,12 @@ _FRESHNESS_COLORS = {
     "transition": T.C_TRANSITION,
     "spoiled": T.C_SPOILED,
 }
+# Renk körlüğü için: sınıf sadece renkle değil ikonla da ayırt edilsin.
+_FRESHNESS_ICONS = {
+    "fresh": ft.Icons.CHECK_CIRCLE,
+    "transition": ft.Icons.WARNING_AMBER_ROUNDED,
+    "spoiled": ft.Icons.CANCEL,
+}
 
 # Mock — ileride bir veritabanından (okuma geçmişi tablosu) çekilecek.
 # Şimdilik sabit örnek veri; freshness_class -> etiket/renk _FRESHNESS_LABELS
@@ -171,7 +177,13 @@ def _recent_read_row(entry: dict) -> ft.Control:
                     ),
                 ],
             ),
-            ft.Text(label, size=T.T_CAPTION, weight=ft.FontWeight.W_600, color=color),
+            ft.Row(
+                spacing=4,
+                controls=[
+                    ft.Icon(_FRESHNESS_ICONS[freshness_class], size=14, color=color),
+                    ft.Text(label, size=T.T_CAPTION, weight=ft.FontWeight.W_600, color=color),
+                ],
+            ),
         ],
     )
 
@@ -363,17 +375,25 @@ def _result_view(page: ft.Page, result: ColorEngineResult, on_rescan) -> ft.Cont
     if result.freshness_class:
         headline_text = _FRESHNESS_LABELS.get(result.freshness_class, result.freshness_class.upper())
         headline_color = _FRESHNESS_COLORS.get(result.freshness_class, T.C_PRIMARY)
+        headline_icon = _FRESHNESS_ICONS.get(result.freshness_class)
     else:
         headline_text = result.technical_level or "Sonuç yok"
         headline_color = T.C_PRIMARY
+        headline_icon = None
 
-    headline = ft.Text(
-        headline_text,
-        size=T.T_TITLE,
-        weight=ft.FontWeight.BOLD,
-        color=headline_color,
-        text_align=ft.TextAlign.CENTER,
+    headline_controls: list[ft.Control] = []
+    if headline_icon is not None:
+        headline_controls.append(ft.Icon(headline_icon, size=28, color=headline_color))
+    headline_controls.append(
+        ft.Text(
+            headline_text,
+            size=T.T_TITLE,
+            weight=ft.FontWeight.BOLD,
+            color=headline_color,
+            text_align=ft.TextAlign.CENTER,
+        )
     )
+    headline = ft.Row(headline_controls, alignment=ft.MainAxisAlignment.CENTER, spacing=T.GAP_S)
 
     detail_rows: list[ft.Control] = [
         _metric_bar("Güven skoru", result.confidence),
@@ -406,7 +426,7 @@ def _result_view(page: ft.Page, result: ColorEngineResult, on_rescan) -> ft.Cont
         controls=[
             section_card(
                 "Tazelik sonucu",
-                ft.Row([headline], alignment=ft.MainAxisAlignment.CENTER),
+                headline,
                 kv("Ürün", _MOCK_LABEL_INFO["product_type"]),
                 kv("Parti", _MOCK_LABEL_INFO["product_id"]),
                 kv("Üretim tarihi", _MOCK_LABEL_INFO["production_date"]),
