@@ -96,6 +96,10 @@ def user_body(page: ft.Page, nav) -> ft.Control:
         body.controls = [_permission_denied_view(show_scan)]
         page.update()
 
+    def show_invalid_qr() -> None:
+        body.controls = [_invalid_qr_view(show_scan)]
+        page.update()
+
     async def on_scan_default(_e) -> None:
         await _run_scan(_MOCK_OK)
 
@@ -114,12 +118,16 @@ def user_body(page: ft.Page, nav) -> ft.Control:
     def on_test_no_permission(_e) -> None:
         show_permission_denied()
 
+    def on_test_invalid_qr(_e) -> None:
+        show_invalid_qr()
+
     _TEST_SCENARIOS = [
         ("Taze", on_test_fresh),
         ("Geçiş", on_test_transition),
         ("Bozuk", on_test_spoiled),
         ("Düşük kalite", on_test_low_quality),
         ("İzin yok", on_test_no_permission),
+        ("Geçersiz QR", on_test_invalid_qr),
     ]
 
     body.controls = [_scan_view(on_scan_default, _TEST_SCENARIOS)]
@@ -213,6 +221,59 @@ def _permission_denied_view(on_retry) -> ft.Control:
     )
 
 
+def _invalid_qr_view(on_retry) -> ft.Control:
+    return ft.Column(
+        spacing=T.GAP_M,
+        controls=[
+            section_card(
+                "Geçersiz QR kodu",
+                ft.Row(
+                    spacing=T.GAP_S,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                    controls=[
+                        ft.Icon(ft.Icons.ERROR_OUTLINE, color=T.C_SPOILED),
+                        ft.Text(
+                            "Bu QR kodu bir FreshQR tazelik etiketine ait değil ya da "
+                            "okunamadı. Ürün etiketindeki QR kodunu çerçeveye alıp "
+                            "tekrar deneyin.",
+                            size=T.T_BODY,
+                            color=T.C_MUTED,
+                            expand=True,
+                        ),
+                    ],
+                ),
+            ),
+            ft.FilledButton(
+                "Tekrar Dene",
+                icon=ft.Icons.REFRESH,
+                height=52,
+                on_click=lambda e: on_retry(),
+            ),
+        ],
+    )
+
+
+def _metric_bar(label: str, value: float | None) -> ft.Control:
+    ratio = max(0.0, min(1.0, value)) if value is not None else 0.0
+    return ft.Column(
+        spacing=T.GAP_XS,
+        controls=[
+            ft.Row(
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                controls=[
+                    ft.Text(label, color=T.C_MUTED, size=T.T_BODY),
+                    ft.Text(
+                        f"{value:.2f}" if value is not None else "—",
+                        size=T.T_BODY,
+                        weight=ft.FontWeight.W_500,
+                    ),
+                ],
+            ),
+            ft.ProgressBar(value=ratio, color=T.C_PRIMARY, bgcolor=T.C_OUTLINE),
+        ],
+    )
+
+
 def _result_view(page: ft.Page, result: ColorEngineResult, on_rescan) -> ft.Control:
     if result.rescan_recommended:
         return ft.Column(
@@ -234,7 +295,7 @@ def _result_view(page: ft.Page, result: ColorEngineResult, on_rescan) -> ft.Cont
                             ),
                         ],
                     ),
-                    kv("Okuma kalitesi", f"{result.quality_score:.2f}"),
+                    _metric_bar("Okuma kalitesi", result.quality_score),
                 ),
                 ft.FilledButton(
                     "Yeniden Tara",
@@ -261,7 +322,7 @@ def _result_view(page: ft.Page, result: ColorEngineResult, on_rescan) -> ft.Cont
     )
 
     detail_rows: list[ft.Control] = [
-        kv("Güven skoru", f"{result.confidence:.2f}" if result.confidence is not None else "—"),
+        _metric_bar("Güven skoru", result.confidence),
         kv("ΔE", f"{result.delta_e:.2f}" if result.delta_e is not None else "—"),
         kv(
             "Eşleşen profil noktası",
@@ -295,7 +356,7 @@ def _result_view(page: ft.Page, result: ColorEngineResult, on_rescan) -> ft.Cont
                 kv("Ürün", _MOCK_LABEL_INFO["product_type"]),
                 kv("Parti", _MOCK_LABEL_INFO["product_id"]),
                 kv("Üretim tarihi", _MOCK_LABEL_INFO["production_date"]),
-                kv("Okuma kalitesi", "Uygun"),
+                _metric_bar("Okuma kalitesi", result.quality_score),
             ),
             ft.Row([details_button], alignment=ft.MainAxisAlignment.CENTER),
             details_container,
