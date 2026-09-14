@@ -2,6 +2,8 @@
 segno>=1.6            # saf-python QR üretimi (packages/qr_layout)
 jsonschema>=4.20      # profil / layout / payload JSON doğrulama (packages/profile_schema)
 Pillow>=10             # reaktif hücrelerin renkli/sentetik render'ı (packages/qr_layout/render.py)
+numpy>=1.24
+opencv-python-headless>=4.9   # QR decode doğrulaması (packages/qr_layout/decode.py, §11 Aşama A)
 
 # apps/producer + apps/consumer (Flet prototipleri) — 0.86 ile test edildi.
 # 0.90'da API kırılımları var; üst sınır bilinçli.
@@ -11,7 +13,6 @@ flet-desktop>=0.86,<0.90     # `flet run -w` bunu da ister (web modunda bile)
 # geliştirme:
 pytest>=8
 
-# İLERİDE (color-engine + tests/synthetic gerçek uygulaması):
-#   numpy, opencv-python veya scikit-image  -> homografi / ROI / renk
-#   pyzbar veya ikinci bir decoder          -> §11 Aşama A çift-decoder testi
-#   pillow                                  -> sentetik taze/geçiş/bozulma görselleri
+# İLERİDE (color-engine gerçek uygulaması, packages/color_engine):
+#   homografi / ROI / renk analizi için numpy + opencv-python-headless zaten kurulu
+#   pyzbar veya başka bir 2. decoder -> §11 Aşama A çift-decoder karşılaştırması

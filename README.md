@@ -60,7 +60,9 @@ Detay: [docs/team.md](docs/team.md) · Git akışı: `main` korumalı, yardımc�
 - ✅ `packages/qr_layout/render.py`: reaktif hücrelerin **renkli** gösterimi
   (Pillow) — taze/geçiş/bozuk sentetik görseller; her modül kendi açık/koyu
   sınıfını korur (§5.2), QR okunabilirliği bozulmaz
-- ✅ `tests/synthetic`: QR/şema/motor/render testleri
+- ✅ `tests/synthetic`: QR/şema/motor/render testleri + **decode doğrulaması**
+  (§11 Aşama A) — renklendirilmiş QR'lar gerçek bir decoder (OpenCV) ile
+  3 yoğunluk × 4 renk durumunda okunuyor mu, otomatik test ediliyor
 - 🚧 `packages/color_engine`: sözleşme + akış iskeleti; gerçek görüntü işleme TODO
 - 🚧 `apps/consumer` **Kullanıcı** ekranı: iskelet, doldurulacak; gerçek tüketici
   uygulamasının framework'ü **Flutter** yönelimli, spike ile kesinleşir

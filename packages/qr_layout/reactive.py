@@ -6,9 +6,12 @@ Rapor §5.2'nin tam algoritması HENÜZ UYGULANMADI:
   - her reaktif rengin gri-seviye / binary davranışının incelenmesi
   - orijinal siyah/beyaz sınıfını bozmayan pozisyonların tercihi
   - kaçınılmazsa kontrollü "intentional error" + ECC/boyut deneysel karşılaştırma
-  - her layout'un tüm renk durumlarında sentetik üretilip >= 2 decoder ile okunması
   - en iyi layout'un layout_version ile sürümlenmesi
 Bunlar tests/synthetic altında ölçülüp buraya bağlanacak.
+
+DOĞRULANDI (tests/synthetic/test_decode_verification.py): üç yoğunluk ×
+dört renk durumunun tamamı tek bir decoder (OpenCV) ile başarıyla okunuyor.
+Rapor ">= 2 decoder" istiyor — ikinci decoder (ör. pyzbar) henüz eklenmedi.
 """
 
 from __future__ import annotations
