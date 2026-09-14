@@ -22,13 +22,17 @@ def icon_badge(icon, size: int = 24) -> ft.Control:
     )
 
 
-def app_header(title: str, on_back=None) -> ft.Control:
+def app_header(title: str, on_back=None, actions: list[ft.Control] | None = None) -> ft.Control:
     row: list[ft.Control] = []
     if on_back is not None:
         row.append(
             ft.IconButton(ft.Icons.ARROW_BACK, icon_color=T.C_ON_HEADER, on_click=lambda e: on_back())
         )
-    row.append(ft.Text(title, size=T.T_HEADING, weight=ft.FontWeight.W_600, color=T.C_ON_HEADER))
+    row.append(
+        ft.Text(title, size=T.T_HEADING, weight=ft.FontWeight.W_600, color=T.C_ON_HEADER, expand=True)
+    )
+    if actions:
+        row.extend(actions)
     return ft.Container(
         bgcolor=T.C_HEADER_BG,
         padding=ft.Padding(left=8, top=10, right=16, bottom=10),
@@ -81,23 +85,27 @@ def kv(label: str, value) -> ft.Control:
     )
 
 
-def stat_card(label: str, value) -> ft.Control:
-    return ft.Card(
+def stat_card_live(label: str, value) -> tuple[ft.Control, ft.Text]:
+    """stat_card ile aynı görünüm, ama değer metnine sonradan erişim de döner
+    (ör. bir olaydan sonra sayacı `value_text.value = ...` ile güncellemek için).
+    """
+    value_text = ft.Text(str(value), size=T.T_TITLE, weight=ft.FontWeight.BOLD, color=T.C_PRIMARY)
+    card = ft.Card(
         elevation=2,
         shape=_CARD_SHAPE,
         bgcolor=ft.Colors.WHITE,
         expand=True,
         content=ft.Container(
             padding=T.GAP_M,
-            content=ft.Column(
-                [
-                    ft.Text(str(value), size=T.T_TITLE, weight=ft.FontWeight.BOLD, color=T.C_PRIMARY),
-                    ft.Text(label, size=T.T_CAPTION, color=T.C_MUTED),
-                ],
-                spacing=T.GAP_XS,
-            ),
+            content=ft.Column([value_text, ft.Text(label, size=T.T_CAPTION, color=T.C_MUTED)], spacing=T.GAP_XS),
         ),
     )
+    return card, value_text
+
+
+def stat_card(label: str, value) -> ft.Control:
+    card, _ = stat_card_live(label, value)
+    return card
 
 
 def nav_tile(title: str, subtitle: str, icon, on_click) -> ft.Control:

@@ -14,9 +14,16 @@ from pathlib import Path
 
 import flet as ft
 
+from consumer.labels import OUT_DIR, count_labels
 from consumer.profiles import load_layout_versions, load_sensor_profiles
 from packages.label_export import build_label_payload, export_label
-from packages.qr_layout import build_layout, generate_qr, reactive_candidates, select_reactive_modules
+from packages.qr_layout import (
+    build_layout,
+    generate_qr,
+    reactive_candidates,
+    seed_from_layout_version,
+    select_reactive_modules,
+)
 from packages.qr_layout.colors import STATE_LABELS
 from packages.qr_layout.render import colored_png_bytes
 from packages.ui_kit import theme as T
@@ -29,11 +36,9 @@ from packages.ui_kit.components import (
     screen,
     section_card,
     stat_card,
+    stat_card_live,
     text_field,
 )
-
-# cwd'den bağımsız: her zaman repo kökündeki out/ (.gitignore'da /out/)
-OUT_DIR = Path(__file__).resolve().parents[4] / "out"
 
 # İlk tür listesi (prototip) — dropdown_field editable=True olduğu için listede
 # olmayan bir tür de elle yazılabilir. İleride profile'dan türetilebilir.
@@ -77,11 +82,23 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
     profiles = load_sensor_profiles()
     layouts = load_layout_versions()
 
+    label_count_card, label_count_text = stat_card_live(
+        "Üretilen etiket", count_labels(OUT_DIR)
+    )
+    label_count_clickable = ft.Container(
+        content=label_count_card,
+        expand=True,
+        border_radius=T.RADIUS,
+        ink=True,
+        tooltip="Üretilen etiketlere bak",
+        on_click=lambda e: nav.labels(),
+    )
     stats = ft.Row(
         spacing=T.GAP_S,
         controls=[
             stat_card("Kalibrasyon profili", len(profiles)),
             stat_card("Etiket sürümü", len(layouts)),
+            label_count_clickable,
         ],
     )
 
@@ -138,7 +155,6 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
         "Layout yoğunluğu", "low", ["low", "medium", "high"], icon=ft.Icons.TUNE
     )
 
-    preview = ft.Image(src="", width=280, height=280, fit=ft.BoxFit.CONTAIN)
     status = ft.Text("", size=T.T_CAPTION, color=T.C_MUTED)
     files_col = ft.Column(spacing=2)
     meta_col = ft.Column(spacing=T.GAP_S)
@@ -154,11 +170,14 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
         )
 
     def do_preview(_e=None) -> None:
+        preview_card.visible = True
         try:
             payload = _payload()
             qr = generate_qr(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), error="h")
             modules = select_reactive_modules(
-                reactive_candidates(qr), density=density.value or "low", seed=0
+                reactive_candidates(qr),
+                density=density.value or "low",
+                seed=seed_from_layout_version(layout_version.value or ""),
             )
             layout = build_layout(
                 qr, modules, layout_version=layout_version.value, density=density.value or "low"
@@ -168,9 +187,13 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
             page.update()
             return
         # Nötr gri = reaktif hücrelerin yerleşimi; henüz bir tazelik durumu değil.
-        preview.src = base64.b64encode(colored_png_bytes(qr, layout, state=None)).decode()
+        preview_frame.content = ft.Image(
+            src=base64.b64encode(colored_png_bytes(qr, layout, state=None)).decode(),
+            fit=ft.BoxFit.CONTAIN,
+        )
         n = 4 * qr.version + 17
         meta_col.controls = [
+            kv("Parti no", payload["product_id"]),
             kv("QR versiyonu", f"v{qr.version}"),
             kv("Modül", f"{n} × {n}"),
             kv("Reaktif modül", len(modules)),
@@ -180,6 +203,7 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
         page.update()
 
     def do_export(_e) -> None:
+        preview_card.visible = True
         try:
             payload = _payload()
             result = export_label(payload, OUT_DIR, density=density.value or "low")
@@ -188,8 +212,12 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
             page.update()
             return
         qr, layout = result["qr"], result["layout"]
-        preview.src = base64.b64encode(colored_png_bytes(qr, layout, state=None)).decode()
+        preview_frame.content = ft.Image(
+            src=base64.b64encode(colored_png_bytes(qr, layout, state=None)).decode(),
+            fit=ft.BoxFit.CONTAIN,
+        )
         meta_col.controls = [
+            kv("Parti no", payload["product_id"]),
             kv("QR versiyonu", f"v{qr.version}"),
             kv("Matris", layout["matrix_size"]),
             kv("Reaktif modül", len(layout["sensor_modules"])),
@@ -216,9 +244,8 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
             for p in result["paths"].values()
         ]
         status.value = f"Dosyalar '{OUT_DIR}/' altına yazıldı."
-        regenerate_batch_no()  # bir sonraki etiket için parti no'yu ilerlet
-
-    do_preview()
+        label_count_text.value = str(count_labels(OUT_DIR))
+        regenerate_batch_no()  # bir sonraki etiket için parti no'yu ilerlet (page.update() içinde)
 
     product_id_row = ft.Row(
         spacing=T.GAP_S,
@@ -250,14 +277,22 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
                     primary_button("Etiketi oluştur", do_export, ft.Icons.QR_CODE_2),
                 ],
             ),
-            status,
         ],
     )
 
     form = section_card("Etiket bilgisi", fields)
 
     preview_frame = ft.Container(
-        content=preview,
+        content=ft.Column(
+            spacing=T.GAP_XS,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(ft.Icons.QR_CODE_2, color=T.C_MUTED, size=48),
+                ft.Text("Önizlemek için 'Önizle'ye bas", size=T.T_CAPTION, color=T.C_MUTED),
+            ],
+        ),
+        width=280,
+        height=280,
         bgcolor=ft.Colors.WHITE,
         border=ft.Border.all(1, T.C_OUTLINE),
         border_radius=T.RADIUS,
@@ -267,7 +302,15 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
 
     preview_card = section_card(
         "Etiket önizleme",
+        ft.Text(
+            "Girdiğin bilgilere göre oluşacak QR'ın canlı önizlemesi — henüz "
+            "hiçbir dosya kaydedilmedi. Gri noktalar reaktif sensör hücrelerinin "
+            "yerleşimini gösterir (henüz bir tazelik durumu değil).",
+            size=T.T_CAPTION,
+            color=T.C_MUTED,
+        ),
         ft.Row([preview_frame], alignment=ft.MainAxisAlignment.CENTER),
+        status,
         meta_col,
         ft.Text(
             "Sentetik durumlar (§8) — 'Etiketi oluştur' sonrası dolar",
@@ -279,6 +322,8 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
         ft.Text("Çıktı dosyaları", size=T.T_CAPTION, weight=ft.FontWeight.W_600, color=T.C_MUTED),
         files_col,
     )
+    # 'Önizle' veya 'Etiketi oluştur'a basılana kadar kart tamamen gizli.
+    preview_card.visible = False
 
     note = ft.Container(
         bgcolor=T.C_ACCENT_BG,

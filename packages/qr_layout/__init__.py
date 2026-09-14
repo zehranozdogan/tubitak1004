@@ -15,7 +15,7 @@ Akış (§5.2):
 
 from packages.qr_layout.function_mask import function_mask, matrix_size
 from packages.qr_layout.generator import generate_qr, module_matrix, reactive_candidates
-from packages.qr_layout.reactive import build_layout, select_reactive_modules
+from packages.qr_layout.reactive import build_layout, seed_from_layout_version, select_reactive_modules
 
 __all__ = [
     "generate_qr",
@@ -24,5 +24,6 @@ __all__ = [
     "matrix_size",
     "reactive_candidates",
     "select_reactive_modules",
+    "seed_from_layout_version",
     "build_layout",
 ]

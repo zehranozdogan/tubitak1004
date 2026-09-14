@@ -17,6 +17,7 @@ from packages.ui_kit.components import (
     screen,
     section_card,
     stat_card,
+    stat_card_live,
     text_field,
 )
 
@@ -32,5 +33,6 @@ __all__ = [
     "screen",
     "section_card",
     "stat_card",
+    "stat_card_live",
     "text_field",
 ]

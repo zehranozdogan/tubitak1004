@@ -4,6 +4,8 @@ import flet as ft
 
 from packages.ui_kit import theme as T
 from consumer.views.admin_view import admin_body
+from consumer.views.label_detail_view import label_detail_body
+from consumer.views.labels_view import labels_body
 from consumer.views.login_view import login_body
 from consumer.views.user_view import user_body
 
@@ -20,6 +22,12 @@ class _Nav:
 
     def user(self):
         self._render(user_body)
+
+    def labels(self):
+        self._render(labels_body)
+
+    def label_detail(self, stem: str):
+        self._render(lambda page, nav: label_detail_body(page, nav, stem))
 
 
 def main(page: ft.Page) -> None:

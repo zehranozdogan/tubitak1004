@@ -14,11 +14,26 @@ Bunlar tests/synthetic altında ölçülüp buraya bağlanacak.
 from __future__ import annotations
 
 import random
+import zlib
 
 from packages.qr_layout.function_mask import matrix_size
 
 # Yoğunluk -> hedef reaktif hücre sayısı (rapor §8: düşük / orta / yüksek 3 aday)
 DENSITY_TARGET = {"low": 12, "medium": 30, "high": 60}
+
+
+def seed_from_layout_version(layout_version: str) -> int:
+    """`layout_version` metninden DETERMİNİSTİK bir seed türetir.
+
+    Amaç: aynı layout_version her zaman aynı reaktif hücre yerleşimini
+    üretsin (fiziksel şablon/kalıp tekrarlanabilir olmalı, §5.2/7), ama
+    farklı bir layout_version farklı bir yerleşim versinler — koda gömülü
+    tek bir sabit seed (ör. hep 0) kullanırsak tüm sürümler aynı geometriye
+    çakışır ve "layout_version" versiyonlamanın anlamı kalmaz.
+    `zlib.crc32` kullanılır (Python'un `hash()`'i süreçler arası kararlı
+    değildir, PYTHONHASHSEED'e bağlıdır).
+    """
+    return zlib.crc32(layout_version.encode("utf-8"))
 
 
 def _chebyshev(a: tuple[int, int], b: tuple[int, int]) -> int:
