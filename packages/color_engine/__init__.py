@@ -16,6 +16,7 @@ DURUM: iskelet. pipeline.analyze() gerçek görüntü işleme YAPMAZ; düşük k
 placeholder döndürür. numpy/opencv eklenince adım adım doldurulacak.
 """
 
+from packages.color_engine.colorspace import delta_e, rgb_to_lab
 from packages.color_engine.pipeline import analyze
 from packages.color_engine.quality import quality_score, should_rescan
 from packages.color_engine.types import ColorEngineResult, Lab, ModuleReading, Rgb
@@ -28,4 +29,6 @@ __all__ = [
     "Lab",
     "quality_score",
     "should_rescan",
+    "rgb_to_lab",
+    "delta_e",
 ]

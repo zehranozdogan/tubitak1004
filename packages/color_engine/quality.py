@@ -33,10 +33,15 @@ def _sharpness_score(gray: Image) -> float:
 def _glare_score(gray: Image, *, saturated_threshold: int = 250) -> float:
     """0..1: parlama/doygunluk piksel oranı düşükse 1.0, artınca 0'a yaklaşır.
 
-    %5'e kadar parlama toleranslı; %25 ve üzeri tamamen kötü (skor 0) sayılır.
+    Tolerans yüksek tutulur (%65'e kadar): QR/etiket gibi metin-ağırlıklı
+    görüntülerde normal, parlamasız durumda bile geniş beyaz alan (quiet
+    zone, açık modüller) olağandır — düşük bir eşik bunu yanlışlıkla
+    "parlama" sayardı. Gerçek flaş/ışık yansıması genelde çerçevenin
+    neredeyse tamamını kaplar; %95 ve üzeri tamamen kötü (skor 0) sayılır.
+    Eşikler gerçek cihaz testleriyle (rapor §11 Aşama B) kalibre edilecek.
     """
     saturated_ratio = float(np.mean(gray >= saturated_threshold))
-    return float(max(0.0, 1.0 - max(0.0, saturated_ratio - 0.05) / 0.20))
+    return float(max(0.0, 1.0 - max(0.0, saturated_ratio - 0.65) / 0.30))
 
 
 def _brightness_score(gray: Image, *, low: int = 40, high: int = 220) -> float:

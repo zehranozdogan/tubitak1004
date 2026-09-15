@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+import numpy as np
+
 Image = Any  # numpy.ndarray gelince daraltılacak
 
 
@@ -21,9 +23,29 @@ def _not_implemented(name: str) -> Callable[..., Image]:
     return _apply
 
 
+def white_black(image: Image, references: dict) -> Image:
+    """Beyaz + siyah iki noktalı referans kalibrasyonu (rapor §6.1 A).
+
+    `references`: {"white": (r,g,b), "black": (r,g,b)} — canonical (homografi
+    sonrası) görüntüde `reference_regions`'tan örneklenmiş ortalama renkler.
+
+    Her kanalı BAĞIMSIZ olarak doğrusal esnetir: referans siyah -> 0,
+    referans beyaz -> 255. Bu hem genel pozlamayı (kazanç) hem de kanallar
+    arası renk sıcaklığı kaymasını (ör. sarımsı ışıkta R kanalının şişmesi)
+    tek işlemde düzeltir — klasik "white balance + black point" tekniği.
+    """
+    white = np.asarray(references["white"], dtype=np.float64)
+    black = np.asarray(references["black"], dtype=np.float64)
+    span = white - black
+    span = np.where(span == 0, 1.0, span)  # sıfıra bölme koruması (dejenere referans)
+
+    corrected = (image.astype(np.float64) - black) / span * 255.0
+    return np.clip(corrected, 0, 255).astype(np.uint8)
+
+
 # Kod -> uygulama. Kodlar sensor_profile.calibration_method.code ile eşleşir.
 METHODS: dict[str, Callable[..., Image]] = {
-    "white_black": _not_implemented("white_black"),                       # A
+    "white_black": white_black,                                            # A
     "white_gray_black": _not_implemented("white_gray_black"),             # B
     "multicolor_patch": _not_implemented("multicolor_patch"),            # C
     "qr_fixed_regions": _not_implemented("qr_fixed_regions"),            # D
