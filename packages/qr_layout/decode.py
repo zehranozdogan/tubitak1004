@@ -1,12 +1,19 @@
 """QR içeriğini görüntüden çözer (rapor §11 Aşama A: sanal QR dayanıklılık testi).
 
-OpenCV'nin QRCodeDetector'ı kullanılır. `packages.color_engine.pipeline`'ın
-1. adımı da (§6.2: "QR/etiket tespiti ve köşe koordinatları") aynı
-mekanizmayı kullanacak — bu modül o entegrasyonun da başlangıç noktasıdır.
+`packages.color_engine.pipeline`'ın 1. adımı da (§6.2: "QR/etiket tespiti ve
+köşe koordinatları") aynı mekanizmayı kullanacak — bu modül o
+entegrasyonun da başlangıç noktasıdır.
+
+DEDEKTÖR SEÇİMİ (elle karşılaştırıldı, tests/synthetic/benchmark_distortion.py):
+`cv2.QRCodeDetectorAruco` kullanılır, TEMEL `cv2.QRCodeDetector` DEĞİL.
+Temel dedektör 45° görüntüleme açısında %0 başarılıydı (köşe/finder-pattern
+tespiti bozuluyor); ArUco tabanlı dedektör kendi içinde daha güçlü köşe
+tespiti yapıyor ve aynı 45° testlerinde başarılı oldu — ek bağımlılık
+gerekmiyor, aynı opencv-python-headless paketinde geliyor.
 
 NOT: `detectAndDecode` (TEKİL) kullanılır, `detectAndDecodeMulti` DEĞİL —
 tek QR içeren görüntülerde çoklu-QR modu güvenilir sonuç vermeyebiliyor
-(bu dosya yazılırken elle doğrulandı).
+(bu dosya yazılırken elle doğrulandı, ilk denemede yanlış-negatif üretmişti).
 """
 
 from __future__ import annotations
@@ -28,6 +35,7 @@ def decode_qr_image(image: Any) -> str | None:
     else:
         array = image
 
-    detector = cv2.QRCodeDetector()
-    text, _points, _ = detector.detectAndDecode(array)
+    detector = cv2.QRCodeDetectorAruco()
+    result = detector.detectAndDecode(array)
+    text = result[0]
     return text or None
