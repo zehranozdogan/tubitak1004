@@ -21,6 +21,7 @@ from dataclasses import replace
 import flet as ft
 
 from consumer.labels import OUT_DIR, load_labels
+from packages.color_engine.quality import quality_score, should_rescan
 from packages.color_engine.types import ColorEngineResult
 from packages.qr_layout.decode import decode_qr_image
 from packages.ui_kit import theme as T
@@ -132,9 +133,10 @@ def user_body(page: ft.Page, nav) -> ft.Control:
     async def on_file_scan(stem: str, state: str) -> None:
         """Kamerasız test: out/'taki GERÇEK etiket görselini gerçek QR
         decoder ile okur (packages.qr_layout.decode — §11 Aşama A'da
-        doğrulanan ArUco tabanlı dedektör). QR içeriği (ürün/parti bilgisi)
-        gerçek; tazelik sonucu hâlâ mock (color_engine.pipeline.analyze()
-        henüz bağlı değil, §6.2)."""
+        doğrulanan ArUco tabanlı dedektör) VE gerçek quality_score() ile
+        ölçer. QR içeriği + okuma kalitesi gerçek; tazelik sonucu hâlâ mock
+        (color_engine.pipeline.analyze() henüz bağlı değil, §6.2)."""
+        import numpy as np
         from PIL import Image
 
         path = OUT_DIR / f"{stem}.state_{state}.png"
@@ -159,10 +161,14 @@ def user_body(page: ft.Page, nav) -> ft.Control:
             "product_id": payload.get("product_id", "—"),
             "production_date": payload.get("production_date", "—"),
         }
+        score = quality_score(np.array(image.convert("L")))
         result = replace(
             _STATE_MOCKS[state],
+            quality_score=score,
+            rescan_recommended=should_rescan(score),
             notes=[
                 "QR gerçekten dosyadan okunup çözüldü (packages.qr_layout.decode). "
+                f"Okuma kalitesi gerçek quality_score() ile ölçüldü ({score:.2f}). "
                 "Tazelik sonucu hâlâ mock — color_engine.pipeline.analyze() "
                 "bağlanınca gerçek ölçüme dönüşecek (§6.2).",
             ],
