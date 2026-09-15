@@ -40,3 +40,32 @@ def module_color(bit: int, is_sensor: bool, state: str | None) -> RGB:
         return (0, 0, 0) if bit else (255, 255, 255)
     tones = STATE_COLORS.get(state, NEUTRAL) if state else NEUTRAL
     return tones["dark"] if bit else tones["light"]
+
+
+def module_pixel_center(row: int, col: int, *, scale: int, border: int) -> tuple[int, int]:
+    """Bir QR modülünün (satır, sütun) rasterize edilmiş görüntüdeki piksel
+    merkezi — `packages.qr_layout.render`'daki ölçeklemeyle AYNI formül
+    (`x0 = (c + border) * scale` vb.). Dönen (satır=piksel_y, sütun=piksel_x)
+    sırası, bir numpy görüntü dizisinde `image[y, x]` ile eşleşir.
+    """
+    x = (col + border) * scale + scale // 2
+    y = (row + border) * scale + scale // 2
+    return (y, x)
+
+
+def finder_pattern_reference_pixels(*, scale: int, border: int) -> dict[str, tuple[int, int]]:
+    """Sol-üst finder pattern'in her QR versiyonunda GARANTİ siyah/beyaz
+    olan iki modülünün piksel merkezini döndürür (rapor §6.1 D: ek baskılı
+    referans yaması gerektirmeyen kalibrasyon — reaktif hücreler bunlara
+    dokunmaz, §5.1 "değiştirilemeyecek bölgeler").
+
+    ISO/IEC 18004 finder pattern yapısı (7x7, versiyon bağımsız):
+      - dış halka (satır/sütun 0 ve 6) hep SİYAH
+      - onun bir içi (1..5 aralığında, iç çekirdek hariç) hep BEYAZ
+      - iç 3x3 çekirdek (2..4, 2..4) hep SİYAH
+    Modül (3,3) -> iç çekirdek (siyah). Modül (1,1) -> beyaz halka.
+    """
+    return {
+        "black": module_pixel_center(3, 3, scale=scale, border=border),
+        "white": module_pixel_center(1, 1, scale=scale, border=border),
+    }

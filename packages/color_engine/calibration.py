@@ -96,6 +96,22 @@ def multicolor_patch(image: Image, references: dict) -> Image:
     return np.clip(corrected, 0, 255).astype(np.uint8)
 
 
+def qr_fixed_regions(image: Image, references: dict) -> Image:
+    """QR'ın kendi sabit siyah/beyaz modüllerini referans alan kalibrasyon
+    (rapor §6.1 D) — ek baskılı referans yaması GEREKTİRMEZ.
+
+    `references`: {"white": (r,g,b), "black": (r,g,b)} — bu renkler QR'ın
+    finder pattern'i gibi hep aynı kalan modüllerinden örneklenmiş olmalı
+    (bkz. `packages.qr_layout.colors.finder_pattern_reference_pixels`,
+    piksel konumlarını verir; örnekleme/ROI adımı bu fonksiyonun DIŞINDA).
+
+    Matematiksel olarak `white_black` (A) ile AYNIDIR — tek fark referans
+    renklerin nereden geldiği: ayrı bir baskı yaması yerine QR'ın zaten var
+    olan sabit modülleri kullanılır, ek baskı maliyeti yoktur.
+    """
+    return white_black(image, references)
+
+
 def algorithmic_white_balance(image: Image, references: dict | None = None) -> Image:
     """Algoritmik white balance / "gray-world" varsayımı (rapor §6.1 E).
 
@@ -122,7 +138,7 @@ METHODS: dict[str, Callable[..., Image]] = {
     "white_black": white_black,                                            # A
     "white_gray_black": white_gray_black,                                  # B
     "multicolor_patch": multicolor_patch,                                  # C
-    "qr_fixed_regions": _not_implemented("qr_fixed_regions"),            # D
+    "qr_fixed_regions": qr_fixed_regions,                                  # D
     "algorithmic_white_balance": algorithmic_white_balance,                # E
     "learned": _not_implemented("learned"),
 }
