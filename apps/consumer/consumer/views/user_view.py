@@ -15,9 +15,14 @@ Sonuç ekranı kuralı (§7.2, kritik):
 
 from __future__ import annotations
 
+import json
+from dataclasses import replace
+
 import flet as ft
 
+from consumer.labels import OUT_DIR, load_labels
 from packages.color_engine.types import ColorEngineResult
+from packages.qr_layout.decode import decode_qr_image
 from packages.ui_kit import theme as T
 from packages.ui_kit.components import app_header, kv, screen, section_card
 
@@ -73,6 +78,10 @@ _MOCK_SPOILED = ColorEngineResult(
     notes=["Mock veri — doğrulanmış eşik senaryosu (henüz gelmedi, önizleme)."],
 )
 
+# "Dosyadan test et" (kamerasız, gerçek decode) burada kullanılıyor: hangi mock
+# ColorEngineResult'ın gösterileceğini, kullanıcının seçtiği duruma göre eşler.
+_STATE_MOCKS = {"fresh": _MOCK_FRESH, "transition": _MOCK_TRANSITION, "spoiled": _MOCK_SPOILED}
+
 _FRESHNESS_LABELS = {"fresh": "TAZE", "transition": "GEÇİŞ", "spoiled": "BOZUK"}
 _FRESHNESS_COLORS = {
     "fresh": T.C_FRESH,
@@ -102,11 +111,11 @@ def user_body(page: ft.Page, nav) -> ft.Control:
     body = ft.Column(spacing=T.GAP_M)
 
     def show_scan() -> None:
-        body.controls = [_scan_view(on_scan_default, _TEST_SCENARIOS)]
+        body.controls = [_scan_view(on_scan_default, _TEST_SCENARIOS, load_labels(), on_file_scan)]
         page.update()
 
-    async def _run_scan(result: ColorEngineResult) -> None:
-        body.controls = [_result_view(page, result, on_rescan=show_scan)]
+    async def _run_scan(result: ColorEngineResult, label_info: dict = _MOCK_LABEL_INFO) -> None:
+        body.controls = [_result_view(page, result, label_info, on_rescan=show_scan)]
         page.update()
 
     def show_permission_denied() -> None:
@@ -119,6 +128,46 @@ def user_body(page: ft.Page, nav) -> ft.Control:
 
     async def on_scan_default(_e) -> None:
         await _run_scan(_MOCK_OK)
+
+    async def on_file_scan(stem: str, state: str) -> None:
+        """Kamerasız test: out/'taki GERÇEK etiket görselini gerçek QR
+        decoder ile okur (packages.qr_layout.decode — §11 Aşama A'da
+        doğrulanan ArUco tabanlı dedektör). QR içeriği (ürün/parti bilgisi)
+        gerçek; tazelik sonucu hâlâ mock (color_engine.pipeline.analyze()
+        henüz bağlı değil, §6.2)."""
+        from PIL import Image
+
+        path = OUT_DIR / f"{stem}.state_{state}.png"
+        try:
+            image = Image.open(path)
+        except OSError:
+            show_invalid_qr()
+            return
+
+        decoded = decode_qr_image(image)
+        if not decoded:
+            show_invalid_qr()
+            return
+        try:
+            payload = json.loads(decoded)
+        except ValueError:
+            show_invalid_qr()
+            return
+
+        label_info = {
+            "product_type": str(payload.get("product_type", "—")).title(),
+            "product_id": payload.get("product_id", "—"),
+            "production_date": payload.get("production_date", "—"),
+        }
+        result = replace(
+            _STATE_MOCKS[state],
+            notes=[
+                "QR gerçekten dosyadan okunup çözüldü (packages.qr_layout.decode). "
+                "Tazelik sonucu hâlâ mock — color_engine.pipeline.analyze() "
+                "bağlanınca gerçek ölçüme dönüşecek (§6.2).",
+            ],
+        )
+        await _run_scan(result, label_info)
 
     async def on_test_fresh(_e) -> None:
         await _run_scan(_MOCK_FRESH)
@@ -147,7 +196,7 @@ def user_body(page: ft.Page, nav) -> ft.Control:
         ("Geçersiz QR", on_test_invalid_qr),
     ]
 
-    body.controls = [_scan_view(on_scan_default, _TEST_SCENARIOS)]
+    body.controls = [_scan_view(on_scan_default, _TEST_SCENARIOS, load_labels(), on_file_scan)]
 
     return screen(app_header("Tazelik", on_back=nav.login), body)
 
@@ -204,7 +253,77 @@ def _recent_reads_card() -> ft.Control:
     return section_card("Son okumalar", *rows)
 
 
-def _scan_view(on_scan, test_scenarios) -> ft.Control:
+def _make_file_scan_handler(on_file_scan, stem: str, state: str):
+    """`on_file_scan` async — Flet'in `on_click`'i lambda içindeki bir
+    coroutine'i otomatik await etmez, bu yüzden gerçek bir async closure
+    gerekiyor (stem/state'i sarmalayan küçük bir yardımcı fonksiyon)."""
+
+    async def handler(_e) -> None:
+        await on_file_scan(stem, state)
+
+    return handler
+
+
+def _file_test_card(labels: list[dict], on_file_scan) -> ft.Control:
+    """Kamera yerine out/'taki GERÇEK etiketlerden birini gerçek QR decoder
+    ile okur (bkz. on_file_scan). Kamera entegrasyonundan önce, "gerçekten
+    okunabiliyor mu" sorusunu kameraya gerek kalmadan yanıtlamak için."""
+    if not labels:
+        return section_card(
+            "Dosyadan test et (gerçek QR okuma)",
+            ft.Text(
+                "out/ içinde henüz üretilmiş etiket yok. Önce Yönetici "
+                "ekranından bir etiket oluşturun.",
+                size=T.T_CAPTION,
+                color=T.C_MUTED,
+            ),
+        )
+
+    rows: list[ft.Control] = [
+        ft.Text(
+            "Kamera yerine gerçekten üretilmiş bir etiket dosyasını, gerçek "
+            "QR decoder ile okur. Ürün bilgisi gerçek; tazelik sonucu hâlâ mock.",
+            size=T.T_CAPTION,
+            color=T.C_MUTED,
+        )
+    ]
+    for label in labels[:5]:
+        stem = label["_stem"]
+        rows.append(ft.Divider(height=1, color=T.C_OUTLINE))
+        rows.append(
+            ft.Column(
+                spacing=T.GAP_XS,
+                controls=[
+                    ft.Text(
+                        f'{label.get("product_type", "—")} · {label.get("product_id", "—")}',
+                        size=T.T_BODY,
+                        weight=ft.FontWeight.W_500,
+                    ),
+                    ft.Row(
+                        spacing=T.GAP_XS,
+                        controls=[
+                            ft.OutlinedButton(
+                                "Taze",
+                                on_click=_make_file_scan_handler(on_file_scan, stem, "fresh"),
+                            ),
+                            ft.OutlinedButton(
+                                "Geçiş",
+                                on_click=_make_file_scan_handler(on_file_scan, stem, "transition"),
+                            ),
+                            ft.OutlinedButton(
+                                "Bozuk",
+                                on_click=_make_file_scan_handler(on_file_scan, stem, "spoiled"),
+                            ),
+                        ],
+                    ),
+                ],
+            )
+        )
+
+    return section_card("Dosyadan test et (gerçek QR okuma)", *rows)
+
+
+def _scan_view(on_scan, test_scenarios, file_labels, on_file_scan) -> ft.Control:
     viewfinder = ft.Container(
         height=220,
         border_radius=T.RADIUS,
@@ -251,6 +370,7 @@ def _scan_view(on_scan, test_scenarios) -> ft.Control:
                 ),
                 test_buttons,
             ),
+            _file_test_card(file_labels, on_file_scan),
             _recent_reads_card(),
         ],
     )
@@ -340,7 +460,9 @@ def _metric_bar(label: str, value: float | None) -> ft.Control:
     )
 
 
-def _result_view(page: ft.Page, result: ColorEngineResult, on_rescan) -> ft.Control:
+def _result_view(
+    page: ft.Page, result: ColorEngineResult, label_info: dict, on_rescan
+) -> ft.Control:
     if result.rescan_recommended:
         return ft.Column(
             spacing=T.GAP_M,
@@ -427,9 +549,9 @@ def _result_view(page: ft.Page, result: ColorEngineResult, on_rescan) -> ft.Cont
             section_card(
                 "Tazelik sonucu",
                 headline,
-                kv("Ürün", _MOCK_LABEL_INFO["product_type"]),
-                kv("Parti", _MOCK_LABEL_INFO["product_id"]),
-                kv("Üretim tarihi", _MOCK_LABEL_INFO["production_date"]),
+                kv("Ürün", label_info["product_type"]),
+                kv("Parti", label_info["product_id"]),
+                kv("Üretim tarihi", label_info["production_date"]),
                 _metric_bar("Okuma kalitesi", result.quality_score),
             ),
             ft.Row([details_button], alignment=ft.MainAxisAlignment.CENTER),
