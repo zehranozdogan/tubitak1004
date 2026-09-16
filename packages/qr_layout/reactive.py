@@ -34,6 +34,7 @@ import random
 import zlib
 from collections import deque
 
+from packages.qr_layout.colors import FINDER_BLACK_MODULE, FINDER_WHITE_MODULE
 from packages.qr_layout.function_mask import matrix_size
 
 # Yoğunluk -> hedef reaktif hücre ORANI (aday havuzunun yüzdesi olarak; rapor
@@ -165,8 +166,22 @@ def build_layout(
     reference_regions: dict[str, list[tuple[int, int]]] | None = None,
     intentional_errors: list[tuple[int, int]] | None = None,
 ) -> dict:
-    """layout_version.schema.json'a uyan sözlük üretir (koordinatlar dışarıda tutulur)."""
+    """layout_version.schema.json'a uyan sözlük üretir (koordinatlar dışarıda tutulur).
+
+    `reference_regions` verilmezse (None), QR'ın kendi finder pattern'indeki
+    GARANTİ siyah/beyaz iki modüle (rapor §6.1 D: `qr_fixed_regions`, ek
+    baskılı referans yaması gerektirmez) otomatik varsayılan atanır — bu
+    yüzden üretici tarafında hiçbir şey yapılmasa bile layout_version.json
+    her zaman geçerli, kullanılabilir bir referans taşır (§10.1: "okuyucu
+    koordinatları hard-code etmez, bu dosyadan okur" ilkesi budur).
+    Gri/çoklu-yama gerektiren yöntemler (§6.1 B, C) için ek anahtarlar
+    ("gray", "captured"/"true") hâlâ elle sağlanmalı — bunlar fiziksel
+    baskı yaması ya da kasıtlı hata (`intentional_errors`) gerektirir,
+    burada otomatik üretilmez.
+    """
     version = qr.version
+    if reference_regions is None:
+        reference_regions = {"black": [FINDER_BLACK_MODULE], "white": [FINDER_WHITE_MODULE]}
     return {
         "layout_version": layout_version,
         "qr_version": version,
@@ -175,7 +190,7 @@ def build_layout(
         "module_density": density,
         "sensor_modules": [[r, c] for r, c in sensor_modules],
         "reference_regions": {
-            k: [[r, c] for r, c in v] for k, v in (reference_regions or {}).items()
+            k: [[r, c] for r, c in v] for k, v in reference_regions.items()
         },
         "intentional_errors": [[r, c] for r, c in (intentional_errors or [])],
         "decoder_check": {

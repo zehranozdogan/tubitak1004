@@ -2,13 +2,17 @@
 
 `image`: BGR numpy dizisi (decode.py/quality.py ile aynı sözleşme).
 
-Bilinen sınırlama: `layout_version.reference_regions` henüz üretici
-tarafında doldurulmuyor (ayrı bir iş, bkz. docs). Bu yüzden beyaz/siyah
-kalibrasyon referansı her zaman QR'ın finder pattern'inden örneklenir
-(D yöntemiyle aynı mekanizma, rapor §6.1 D — reaktif hücreler bu sabit
-bölgeye dokunmaz, §5.1). Gri/çoklu-yama referansı gerektiren yöntemler
-(B, C) bu yüzden şimdilik `white_black`'e (A) düşer; `confidence` için
-henüz doğrulanmış bir formül yok (None döner).
+`layout_version.reference_regions` artık üretici tarafında dolduruluyor
+(qr_layout/reactive.py::build_layout(), varsayılan: QR'ın finder pattern
+sabitleri — D yöntemi, ek baskılı yama gerektirmez, reaktif hücreler bu
+sabit bölgeye dokunmaz, §5.1). Eski/elle kurulmuş layout_version'larda bu
+alan yoksa QR sabitlerine düşülür (geriye dönük uyumluluk).
+
+Bilinen sınırlama: gri/çoklu-yama referansı gerektiren yöntemler (B, C)
+hâlâ `white_black`'e (A) düşer — bunlar ya fiziksel ek baskı yaması ya da
+kasıtlı hata modülü (`intentional_errors`, §5.2/4, henüz uygulanmadı)
+gerektiriyor; `confidence` için de henüz doğrulanmış bir formül yok
+(None döner).
 """
 
 from __future__ import annotations
@@ -71,21 +75,29 @@ def analyze(
         image, qr_corners, matrix_size=matrix_size, scale=_CANONICAL_SCALE, border=_CANONICAL_BORDER
     )
 
-    # 3. Kalibrasyon — referanslar finder pattern'den örneklenir (yukarıdaki not).
+    # 3. Kalibrasyon — referans modül konumları layout_version.reference_regions'tan
+    #    okunur (§10.1: "okuyucu koordinatları hard-code etmez, bu dosyadan okur").
+    #    Eski/elle kurulmuş layout_version'larda bu alan yoksa (geriye dönük
+    #    uyumluluk) QR'ın finder pattern sabitlerine düşülür — build_layout()
+    #    artık bunu otomatik dolduruyor, bkz. qr_layout/reactive.py.
     notes: list[str] = []
     code = (sensor_profile.get("calibration_method") or {}).get("code", "white_black")
     if code not in _SUPPORTED_WITHOUT_EXTRA_REFERENCES:
         notes.append(
             f"Kalibrasyon yöntemi '{code}' ek referans (gri/çoklu-yama) gerektiriyor; "
-            "layout_version.reference_regions henüz doldurulmadığı için white_black'e düşüldü."
+            "layout_version.reference_regions bu anahtarları içermediği için white_black'e düşüldü."
         )
         code = "white_black"
 
+    ref_regions = layout_version.get("reference_regions") or {}
+    white_pos = tuple(ref_regions["white"][0]) if ref_regions.get("white") else FINDER_WHITE_MODULE
+    black_pos = tuple(ref_regions["black"][0]) if ref_regions.get("black") else FINDER_BLACK_MODULE
+
     white_ref = robust_module_color(
-        sample_module_roi(canonical, *FINDER_WHITE_MODULE, scale=_CANONICAL_SCALE, border=_CANONICAL_BORDER)
+        sample_module_roi(canonical, *white_pos, scale=_CANONICAL_SCALE, border=_CANONICAL_BORDER)
     )
     black_ref = robust_module_color(
-        sample_module_roi(canonical, *FINDER_BLACK_MODULE, scale=_CANONICAL_SCALE, border=_CANONICAL_BORDER)
+        sample_module_roi(canonical, *black_pos, scale=_CANONICAL_SCALE, border=_CANONICAL_BORDER)
     )
     apply_calibration = calibration.get(code)
     if code == "algorithmic_white_balance":

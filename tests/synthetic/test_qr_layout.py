@@ -10,6 +10,7 @@ from packages.qr_layout import (
     reactive_candidates,
     select_reactive_modules,
 )
+from packages.qr_layout.colors import FINDER_BLACK_MODULE, FINDER_WHITE_MODULE
 from packages.qr_layout.reactive import DENSITY_FRACTION
 
 
@@ -86,3 +87,29 @@ def test_build_layout_matches_schema():
     validate(layout, "layout_version")  # jsonschema yoksa uyarı ile geçer
     assert layout["matrix_size"] == matrix_size(qr.version)
     assert layout["ecc_level"] == "H"
+
+
+def test_build_layout_explicit_reference_regions_not_overridden():
+    """reference_regions elle verilirse (ör. gri/çoklu-yama denemesi) aynen
+    korunmalı — varsayılan finder-pattern doldurma yalnızca hiç verilmediğinde
+    (None) devreye girmeli."""
+    qr = generate_qr("payload-123", error="h")
+    layout = build_layout(
+        qr, [], layout_version="QR_TEST_v1",
+        reference_regions={"white": [(9, 9)], "black": [(20, 20)]},
+    )
+    assert layout["reference_regions"] == {"white": [[9, 9]], "black": [[20, 20]]}
+
+
+def test_build_layout_defaults_reference_regions_to_finder_pattern():
+    """reference_regions hiç verilmezse (rapor §6.1 D / §10.1: okuyucu
+    koordinatları hard-code etmez, bu dosyadan okur) QR'ın finder
+    pattern'indeki garanti siyah/beyaz modüllere otomatik düşmeli — böylece
+    üretici hiçbir şey yapmasa bile pipeline her zaman geçerli bir kalibrasyon
+    referansı bulur (packages.color_engine.pipeline.analyze)."""
+    qr = generate_qr("payload-123", error="h")
+    layout = build_layout(qr, [], layout_version="QR_TEST_v1")
+    assert layout["reference_regions"] == {
+        "black": [[FINDER_BLACK_MODULE[0], FINDER_BLACK_MODULE[1]]],
+        "white": [[FINDER_WHITE_MODULE[0], FINDER_WHITE_MODULE[1]]],
+    }
