@@ -1,0 +1,19 @@
+{
+  "profile_id": "DEMO_QR_STATE_COLORS_v1",
+  "analyte_axis": "demo_state_index",
+  "scale_points": [
+    { "value": 0.0, "rgb": [0, 140, 40],    "lab": [50.58, -52.84, 42.50], "state": "fresh" },
+    { "value": 0.1, "rgb": [140, 255, 160], "lab": [91.52, -52.11, 35.49], "state": "fresh" },
+    { "value": 1.0, "rgb": [185, 90, 0],    "lab": [49.04, 34.20, 58.03],  "state": "transition" },
+    { "value": 1.1, "rgb": [255, 185, 90],  "lab": [80.01, 16.12, 56.94],  "state": "transition" },
+    { "value": 2.0, "rgb": [210, 0, 0],     "lab": [43.81, 69.18, 58.05],  "state": "spoiled" },
+    { "value": 2.1, "rgb": [255, 140, 140], "lab": [70.81, 43.36, 19.56],  "state": "spoiled" }
+  ],
+  "calibration_method": {
+    "code": "white_black",
+    "params": { "note": "Demo/test profili — packages/qr_layout/colors.py::STATE_COLORS ile birebir eşleşir (bkz. docs/decisions)." }
+  },
+  "class_thresholds": { "fresh_max": 1.0, "transition_max": 2.0, "metric": "CIEDE2000" },
+  "quality_gate": { "min_quality_score": 0.5 },
+  "output_fields": ["state", "technical_level", "delta_e", "confidence"]
+}
