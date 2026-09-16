@@ -1,10 +1,13 @@
 """Kullanıcı sayfası — tarama + sonuç akışı (rapor §7).
 
 Akış: Tarama ekranı (kamera henüz yok, buton simüle eder) → Sonuç ekranı.
-Veri şimdilik mock; gerçek entegrasyonda `_run_scan` içindeki
-mock sonuç yerine `packages.color_engine.pipeline.analyze()` çağrılacak —
-ColorEngineResult şekli burada da kullanılıyor ki geçiş kod değişikliği
-gerektirmesin.
+"Test senaryoları" (Taze/Geçiş/vb.) mock ColorEngineResult kullanır —
+sonuç ekranının tüm dallarını kamera/gerçek etiket olmadan önizlemek
+için. "Dosyadan test et" ise GERÇEK: out/'taki üretilmiş bir etiket
+görselini `packages.color_engine.pipeline.analyze()` ile uçtan uca işler
+(QR decode, homografi, kalibrasyon, ROI örnekleme, ΔE eşleştirme).
+Kamera entegrasyonu geldiğinde yalnızca görüntü kaynağı değişecek, akış
+aynı kalacak.
 
 Sonuç ekranı kuralı (§7.2, kritik):
 - `rescan_recommended` ise sınıf/seviye GÖSTERME, "Yeniden tara" göster.
@@ -21,8 +24,10 @@ from dataclasses import replace
 import flet as ft
 
 from consumer.labels import OUT_DIR, load_labels
-from packages.color_engine.quality import quality_score, should_rescan
+from packages.color_engine.pipeline import analyze
 from packages.color_engine.types import ColorEngineResult
+from packages.profile_schema.loader import EXAMPLES_DIR as PROFILE_EXAMPLES_DIR
+from packages.profile_schema.loader import load_layout_version, load_sensor_profile
 from packages.qr_layout.decode import decode_qr_image
 from packages.ui_kit import theme as T
 from packages.ui_kit.components import app_header, kv, screen, section_card
@@ -79,10 +84,6 @@ _MOCK_SPOILED = ColorEngineResult(
     notes=["Mock veri — doğrulanmış eşik senaryosu (henüz gelmedi, önizleme)."],
 )
 
-# "Dosyadan test et" (kamerasız, gerçek decode) burada kullanılıyor: hangi mock
-# ColorEngineResult'ın gösterileceğini, kullanıcının seçtiği duruma göre eşler.
-_STATE_MOCKS = {"fresh": _MOCK_FRESH, "transition": _MOCK_TRANSITION, "spoiled": _MOCK_SPOILED}
-
 _FRESHNESS_LABELS = {"fresh": "TAZE", "transition": "GEÇİŞ", "spoiled": "BOZUK"}
 _FRESHNESS_COLORS = {
     "fresh": T.C_FRESH,
@@ -131,22 +132,21 @@ def user_body(page: ft.Page, nav) -> ft.Control:
         await _run_scan(_MOCK_OK)
 
     async def on_file_scan(stem: str, state: str) -> None:
-        """Kamerasız test: out/'taki GERÇEK etiket görselini gerçek QR
-        decoder ile okur (packages.qr_layout.decode — §11 Aşama A'da
-        doğrulanan ArUco tabanlı dedektör) VE gerçek quality_score() ile
-        ölçer. QR içeriği + okuma kalitesi gerçek; tazelik sonucu hâlâ mock
-        (color_engine.pipeline.analyze() henüz bağlı değil, §6.2)."""
+        """Kamerasız test: out/'taki GERÇEK etiket görselini okur ve
+        packages.color_engine.pipeline.analyze() ile UÇTAN UCA GERÇEK
+        sonuç üretir (QR decode, homografi, kalibrasyon, ROI örnekleme,
+        ΔE eşleştirme — hepsi gerçek, kamera yerine dosyadan okunuyor)."""
         import numpy as np
         from PIL import Image
 
         path = OUT_DIR / f"{stem}.state_{state}.png"
         try:
-            image = Image.open(path)
+            pil_image = Image.open(path)
         except OSError:
             show_invalid_qr()
             return
 
-        decoded = decode_qr_image(image)
+        decoded = decode_qr_image(pil_image)
         if not decoded:
             show_invalid_qr()
             return
@@ -161,16 +161,25 @@ def user_body(page: ft.Page, nav) -> ft.Control:
             "product_id": payload.get("product_id", "—"),
             "production_date": payload.get("production_date", "—"),
         }
-        score = quality_score(np.array(image.convert("L")))
+
+        try:
+            layout_version = load_layout_version(OUT_DIR / f"{stem}.layout_version.json")
+            profile_id = payload["sensor_profile_id"]
+            sensor_profile = load_sensor_profile(
+                PROFILE_EXAMPLES_DIR / f"{profile_id}.sensor_profile.json"
+            )
+        except (OSError, KeyError, ValueError):
+            show_invalid_qr()
+            return
+
+        array = np.array(pil_image.convert("RGB"))[:, :, ::-1]  # RGB -> BGR (pipeline sözleşmesi)
+        result = analyze(array, sensor_profile, layout_version)
         result = replace(
-            _STATE_MOCKS[state],
-            quality_score=score,
-            rescan_recommended=should_rescan(score),
+            result,
             notes=[
-                "QR gerçekten dosyadan okunup çözüldü (packages.qr_layout.decode). "
-                f"Okuma kalitesi gerçek quality_score() ile ölçüldü ({score:.2f}). "
-                "Tazelik sonucu hâlâ mock — color_engine.pipeline.analyze() "
-                "bağlanınca gerçek ölçüme dönüşecek (§6.2).",
+                *result.notes,
+                "Uçtan uca GERÇEK sonuç: QR decode + homografi + kalibrasyon + "
+                "ROI örnekleme + ΔE eşleştirme (color_engine.pipeline.analyze()).",
             ],
         )
         await _run_scan(result, label_info)
@@ -271,9 +280,11 @@ def _make_file_scan_handler(on_file_scan, stem: str, state: str):
 
 
 def _file_test_card(labels: list[dict], on_file_scan) -> ft.Control:
-    """Kamera yerine out/'taki GERÇEK etiketlerden birini gerçek QR decoder
-    ile okur (bkz. on_file_scan). Kamera entegrasyonundan önce, "gerçekten
-    okunabiliyor mu" sorusunu kameraya gerek kalmadan yanıtlamak için."""
+    """Kamera yerine out/'taki GERÇEK etiketlerden birini, tüm renk motoru
+    zincirinden (QR decode, homografi, kalibrasyon, ROI örnekleme, ΔE
+    eşleştirme) uçtan uca geçirir (bkz. on_file_scan). Kamera
+    entegrasyonundan önce, "gerçekten çalışıyor mu" sorusunu kameraya
+    gerek kalmadan yanıtlamak için."""
     if not labels:
         return section_card(
             "Dosyadan test et (gerçek QR okuma)",
@@ -287,8 +298,9 @@ def _file_test_card(labels: list[dict], on_file_scan) -> ft.Control:
 
     rows: list[ft.Control] = [
         ft.Text(
-            "Kamera yerine gerçekten üretilmiş bir etiket dosyasını, gerçek "
-            "QR decoder ile okur. Ürün bilgisi gerçek; tazelik sonucu hâlâ mock.",
+            "Kamera yerine gerçekten üretilmiş bir etiket dosyasını, tüm "
+            "renk motoru zincirinden (QR decode, homografi, kalibrasyon, "
+            "ΔE eşleştirme) uçtan uca geçirir — sonuç tamamen gerçek.",
             size=T.T_CAPTION,
             color=T.C_MUTED,
         )

@@ -53,19 +53,22 @@ def module_pixel_center(row: int, col: int, *, scale: int, border: int) -> tuple
     return (y, x)
 
 
-def finder_pattern_reference_pixels(*, scale: int, border: int) -> dict[str, tuple[int, int]]:
-    """Sol-üst finder pattern'in her QR versiyonunda GARANTİ siyah/beyaz
-    olan iki modülünün piksel merkezini döndürür (rapor §6.1 D: ek baskılı
-    referans yaması gerektirmeyen kalibrasyon — reaktif hücreler bunlara
-    dokunmaz, §5.1 "değiştirilemeyecek bölgeler").
+# Sol-üst finder pattern'in her QR versiyonunda GARANTİ siyah/beyaz olan
+# iki modülü (ISO/IEC 18004, versiyon bağımsız): dış halka (satır/sütun 0
+# ve 6) hep SİYAH, bir içi (iç çekirdek hariç) hep BEYAZ, iç 3x3 çekirdek
+# (2..4, 2..4) hep SİYAH. `packages.color_engine.pipeline` bu sabitleri
+# referans örnekleme için kullanır (rapor §6.1 D).
+FINDER_BLACK_MODULE = (3, 3)
+FINDER_WHITE_MODULE = (1, 1)
 
-    ISO/IEC 18004 finder pattern yapısı (7x7, versiyon bağımsız):
-      - dış halka (satır/sütun 0 ve 6) hep SİYAH
-      - onun bir içi (1..5 aralığında, iç çekirdek hariç) hep BEYAZ
-      - iç 3x3 çekirdek (2..4, 2..4) hep SİYAH
-    Modül (3,3) -> iç çekirdek (siyah). Modül (1,1) -> beyaz halka.
+
+def finder_pattern_reference_pixels(*, scale: int, border: int) -> dict[str, tuple[int, int]]:
+    """FINDER_BLACK_MODULE / FINDER_WHITE_MODULE'ün piksel merkezlerini
+    döndürür (rapor §6.1 D: ek baskılı referans yaması gerektirmeyen
+    kalibrasyon — reaktif hücreler bunlara dokunmaz, §5.1 "değiştirilemeyecek
+    bölgeler").
     """
     return {
-        "black": module_pixel_center(3, 3, scale=scale, border=border),
-        "white": module_pixel_center(1, 1, scale=scale, border=border),
+        "black": module_pixel_center(*FINDER_BLACK_MODULE, scale=scale, border=border),
+        "white": module_pixel_center(*FINDER_WHITE_MODULE, scale=scale, border=border),
     }

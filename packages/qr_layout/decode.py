@@ -27,6 +27,18 @@ def decode_qr_image(image: Any) -> str | None:
     Okunamazsa None döner (hata fırlatmaz) — çağıran taraf bunu §7.1'deki
     "Yeniden tara" durumu gibi ele alabilir.
     """
+    text, _corners = decode_qr_image_with_corners(image)
+    return text
+
+
+def decode_qr_image_with_corners(image: Any) -> tuple[str | None, Any]:
+    """`decode_qr_image` ile aynı, ama QR'ın 4 köşe piksel koordinatını da
+    döndürür — `packages.color_engine.pipeline`'ın homografi adımı (§6.2/2)
+    bunu kullanır. Köşe sırası: sol-üst, sağ-üst, sağ-alt, sol-alt (saat
+    yönünde) — elle doğrulandı (`cv2.QRCodeDetectorAruco.detectAndDecode`).
+
+    Döner: (metin ya da None, (4,2) numpy dizisi ya da None).
+    """
     import cv2
     import numpy as np
 
@@ -36,6 +48,7 @@ def decode_qr_image(image: Any) -> str | None:
         array = image
 
     detector = cv2.QRCodeDetectorAruco()
-    result = detector.detectAndDecode(array)
-    text = result[0]
-    return text or None
+    text, points = detector.detectAndDecode(array)[:2]
+    if not text or points is None or len(points) == 0:
+        return (None, None)
+    return (text, points.reshape(4, 2))
