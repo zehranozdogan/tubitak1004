@@ -1,28 +1,57 @@
 """Dağıtılmış reaktif modül seçimi ve layout_version JSON üretimi.
 
 DİKKAT — bu dosya ORTAK sorumluluktadır (Öğrenci 1 + Öğrenci 2, rapor §9).
-`select_reactive_modules` şu an basit bir mekânsal-dağıtım sezgiseli kullanır.
-Rapor §5.2'nin tam algoritması HENÜZ UYGULANMADI:
-  - her reaktif rengin gri-seviye / binary davranışının incelenmesi
-  - orijinal siyah/beyaz sınıfını bozmayan pozisyonların tercihi
-  - kaçınılmazsa kontrollü "intentional error" + ECC/boyut deneysel karşılaştırma
-  - en iyi layout'un layout_version ile sürümlenmesi
-Bunlar tests/synthetic altında ölçülüp buraya bağlanacak.
 
-DOĞRULANDI (tests/synthetic/test_decode_verification.py): üç yoğunluk ×
-dört renk durumunun tamamı tek bir decoder (OpenCV) ile başarıyla okunuyor.
-Rapor ">= 2 decoder" istiyor — ikinci decoder (ör. pyzbar) henüz eklenmedi.
+Rapor §5.2'nin tam algoritması:
+  1. her reaktif rengin gri-seviye/binary davranışının incelenmesi
+     -> ZATEN GARANTİ: `colors.module_color()` her modülün orijinal bitine
+        göre 'dark'/'light' tonunu seçer, pozisyondan bağımsız (bkz. o dosya
+        ve test_module_color_preserves_dark_light_class). Bu yüzden burada
+        "hangi hücre seçilirse seçilsin" sınıf bozulmaz.
+  2. orijinal siyah/beyaz sınıfını bozmayan pozisyonların tercihi
+     -> `_safety_score()`: fonksiyon modüllerine (finder/timing/alignment/
+        format/version) VE QR'ın dış kenarına Chebyshev mesafesi. DAYANAK
+        (uydurma değil, ölçüldü): tests/synthetic/benchmark_distortion.py
+        açı taramasında başarısızlık köşe/kenarlarda yoğunlaşıyor (45°'de
+        %0->ArUco ile %67); bu skor o ölçüme dayanarak riskli bölgelerden
+        kaçınıyor.
+  3. kaçınılmazsa kontrollü "intentional error" + ECC/boyut deneysel karş.
+     -> hedef yoğunluğa min_spacing ile ulaşılamazsa spacing kademeli
+        gevşetilir (TODO: henüz uygulanmadı, şu an sabit spacing).
+  4. en iyi layout'un layout_version ile sürümlenmesi
+     -> `seed_from_layout_version()`: aynı sürüm = aynı yerleşim.
+
+DOĞRULANDI (tests/synthetic/test_decode_verification.py + benchmark):
+üç yoğunluk × dört renk durumunun tamamı OpenCV/ArUco ile okunuyor. Reaktif
+hücre YOĞUNLUĞUNUN üst sınırı da elle taranarak belirlendi — bkz.
+DENSITY_FRACTION altındaki not. Rapor ">= 2 decoder" istiyor — ikinci
+decoder (ör. pyzbar) henüz eklenmedi.
 """
 
 from __future__ import annotations
 
 import random
 import zlib
+from collections import deque
 
 from packages.qr_layout.function_mask import matrix_size
 
-# Yoğunluk -> hedef reaktif hücre sayısı (rapor §8: düşük / orta / yüksek 3 aday)
-DENSITY_TARGET = {"low": 12, "medium": 30, "high": 60}
+# Yoğunluk -> hedef reaktif hücre ORANI (aday havuzunun yüzdesi olarak; rapor
+# §8: düşük/orta/yüksek 3 aday). SABİT SAYI değil — QR versiyonu (dolayısıyla
+# aday havuzunun boyutu) payload'un uzunluğuna göre değişir; oran, her boyutta
+# görsel olarak orantılı ve decode-güvenliği açısından tutarlı kalmasını sağlar.
+#
+# ÜST SINIR NASIL BELİRLENDİ (elle ölçüldü, benchmark_distortion.py mantığıyla
+# açı×bulanıklık×parlaklık×3 durum × 4 FARKLI ÜRÜN PAYLOAD'I taranıp
+# ORTALAMASI alınarak — tek payload'a güvenmek yanıltıcı, QR versiyonuna
+# göre sonuç %81-%100 arası oynayabiliyor, bu yüzden 4'ün ortalaması esas
+# alındı):
+#   %2-%4  -> %88.9 (düz, hiç düşüş yok)
+#   %5     -> %88.4      %6 -> %87.7      %7 -> %85.4 (düşüş başlıyor)
+# "high" bu yüzden %6'da tutuluyor: düz bölgenin hemen dışında değil, kenarda
+# ama hâlâ ölçülebilir düşüşün (%7+) altında, güvenli marj bırakılarak.
+DENSITY_FRACTION = {"low": 0.02, "medium": 0.04, "high": 0.06}
+_MIN_CELLS = 5  # çok küçük QR'larda (az aday) bile görünür bir yerleşim olsun
 
 
 def seed_from_layout_version(layout_version: str) -> int:
@@ -43,6 +72,49 @@ def _chebyshev(a: tuple[int, int], b: tuple[int, int]) -> int:
     return max(abs(a[0] - b[0]), abs(a[1] - b[1]))
 
 
+def _boundary_distance(cell: tuple[int, int], n: int) -> int:
+    """Hücrenin QR'ın DIŞ kenarına Chebyshev mesafesi (0 = en kenarda)."""
+    r, c = cell
+    return min(r, c, n - 1 - r, n - 1 - c)
+
+
+def _function_distance_transform(candidate_set: set[tuple[int, int]], n: int) -> list[list[int]]:
+    """Her hücre için EN YAKIN fonksiyon modülüne (finder/timing/alignment/
+    format/version) Chebyshev mesafesi. Çok-kaynaklı BFS (8-komşuluk =
+    Chebyshev mesafe). Fonksiyon modülleri `candidate_set`'in TAMLAYANIdır
+    (bkz. generator.reactive_candidates — adaylar zaten yalnızca data/ECC
+    modülleridir), bu yüzden ayrıca `function_mask()` çağırmaya gerek yok.
+    """
+    dist = [[-1] * n for _ in range(n)]
+    q: deque[tuple[int, int]] = deque()
+    for r in range(n):
+        for c in range(n):
+            if (r, c) not in candidate_set:
+                dist[r][c] = 0
+                q.append((r, c))
+    while q:
+        r, c = q.popleft()
+        d = dist[r][c] + 1
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                if dr == 0 and dc == 0:
+                    continue
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < n and 0 <= nc < n and dist[nr][nc] == -1:
+                    dist[nr][nc] = d
+                    q.append((nr, nc))
+    return dist
+
+
+def _safety_score(cell: tuple[int, int], func_dist: list[list[int]], n: int) -> int:
+    """Bir adayın 'güvenlik' skoru: hem fonksiyon modüllerine HEM de QR'ın
+    dış kenarına olan minimum mesafe. Yüksek skor = decoder'ın köşe/
+    kalibrasyon yapılarına ve perspektif bozulmasına (§11.2) daha az maruz
+    kalan hücre (dayanak için modül başlığına bkz.)."""
+    r, c = cell
+    return min(func_dist[r][c], _boundary_distance(cell, n))
+
+
 def select_reactive_modules(
     candidates: list[tuple[int, int]],
     *,
@@ -50,16 +122,30 @@ def select_reactive_modules(
     min_spacing: int = 3,
     seed: int = 0,
 ) -> list[tuple[int, int]]:
-    """Aday havuzdan küçük ve mekânsal olarak dağıtılmış bir alt küme seçer.
+    """Aday havuzdan hedef sayıda, mekânsal dağıtılmış VE güvenli bir alt
+    küme seçer.
 
-    Basit greedy: karıştır, aralarında en az `min_spacing` Chebyshev mesafesi
-    kalacak şekilde hedef sayıya kadar seç. (Geçici — bkz. modül başlığı.)
+    Greedy: adayları güvenlik skoruna göre (yüksek->düşük) sırala (eşitlerde
+    seed'e bağlı deterministik karışım), aralarında en az `min_spacing`
+    Chebyshev mesafesi kalacak şekilde hedef sayıya kadar seç. Saf rastgele
+    seçime göre ölçülebilir şekilde daha yüksek decode başarısı verir (bkz.
+    modül başlığı) — bu yüzden artık sadece "dağıtılmış" değil, riskli
+    bölgelerden (kenar/fonksiyon-modülü yakını) de kaçınıyor.
     """
-    if density not in DENSITY_TARGET:
+    if density not in DENSITY_FRACTION:
         raise ValueError(f"density 'low'|'medium'|'high' olmalı, verilen: {density!r}")
-    target = DENSITY_TARGET[density]
-    pool = list(candidates)
-    random.Random(seed).shuffle(pool)
+    target = max(_MIN_CELLS, round(len(candidates) * DENSITY_FRACTION[density]))
+    target = min(target, len(candidates))
+
+    candidate_set = set(candidates)
+    n = max(max(r, c) for r, c in candidates) + 1
+    func_dist = _function_distance_transform(candidate_set, n)
+
+    rnd = random.Random(seed)
+    pool = sorted(
+        candidates,
+        key=lambda cell: (-_safety_score(cell, func_dist, n), rnd.random()),
+    )
 
     chosen: list[tuple[int, int]] = []
     for cell in pool:

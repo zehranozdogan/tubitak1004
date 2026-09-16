@@ -10,6 +10,7 @@ from packages.qr_layout import (
     reactive_candidates,
     select_reactive_modules,
 )
+from packages.qr_layout.reactive import DENSITY_FRACTION
 
 
 def test_matrix_size():
@@ -47,11 +48,29 @@ def test_select_reactive_modules_are_distributed_and_in_pool():
     qr = generate_qr("payload-123", error="h")
     candidates = reactive_candidates(qr)
     modules = select_reactive_modules(candidates, density="low", min_spacing=3, seed=1)
-    assert 1 <= len(modules) <= 12
+    # Hedef SABİT sayı değil, aday havuzunun oranı (DENSITY_FRACTION) — QR
+    # boyutu payload'a göre değiştiği için üst sınırı da orana göre hesapla.
+    max_expected = max(5, round(len(candidates) * DENSITY_FRACTION["low"]))
+    assert 1 <= len(modules) <= max_expected
     assert set(modules).issubset(set(candidates))
     for i, a in enumerate(modules):
         for b in modules[i + 1:]:
             assert max(abs(a[0] - b[0]), abs(a[1] - b[1])) >= 3
+
+
+def test_higher_density_yields_more_reactive_cells():
+    """Yoğunluk oranla ölçekleniyor: high, low'dan gözle görülür şekilde
+    daha çok hücre seçmeli (kullanıcı geri bildirimi: renkli kısımlar azdı)."""
+    qr = generate_qr(
+        '{"product_id":"TR1","product_type":"LEVREK","production_date":"2026-01-01",'
+        '"sensor_profile_id":"GENIPIN_PUTRESIN_v2","layout_version":"QR_SENSOR_v4"}',
+        error="h",
+    )
+    candidates = reactive_candidates(qr)
+    low = select_reactive_modules(candidates, density="low", seed=1)
+    medium = select_reactive_modules(candidates, density="medium", seed=1)
+    high = select_reactive_modules(candidates, density="high", seed=1)
+    assert len(low) < len(medium) < len(high)
 
 
 def test_build_layout_matches_schema():
