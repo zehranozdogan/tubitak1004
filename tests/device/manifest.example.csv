@@ -1,0 +1,3 @@
+photo_path,phone_model,camera,lighting,color_temp_k,distance_cm,angle_deg,flash,expected_state,note
+C:\path\to\photo1.jpg,iPhone 13,arka,ofis,4000,15,0,kapali,fresh,
+C:\path\to\photo2.jpg,Samsung S22,arka,spot,5500,10,30,kapali,spoiled,

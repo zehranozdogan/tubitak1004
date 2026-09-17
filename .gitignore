@@ -21,8 +21,11 @@ dist/
 .vscode/
 .DS_Store
 
-# Cihaz test logları ham (özet CSV commit'lenir)
+# Cihaz test logları ham (özet CSV commit'lenir) + kişisel manifest
+# (yerel dosya yolları içerir — herkes kendi manifest.example.csv'sinden
+# kendi manifest.csv'sini oluşturur)
 /tests/device/raw/
+/tests/device/manifest.csv
 
 # Flet
 .flet/

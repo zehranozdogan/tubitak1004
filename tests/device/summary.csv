@@ -1,0 +1,2 @@
+run_timestamp,manifest,n,decode_success_rate,mean_delta_e,min_delta_e,max_delta_e,rescan_rate,accuracy,mean_total_ms
+2026-09-17T14:57:51,manifest.csv,2,1.0,25.689,23.722,27.655,0.0,,251.8
