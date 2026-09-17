@@ -98,3 +98,33 @@ def edge_gray_patch_position(matrix_size: int, *, border: int) -> tuple[int, int
     layout_version'da taşınabiliyor)."""
     center_row = -(border + EDGE_PATCH_MARGIN // 2 + 1)
     return (center_row, matrix_size // 2)
+
+
+# --- Çoklu renk yaması (rapor §6.1 C: "3x3/çok renkli düzeltme matrisi" —
+# `calibration.multicolor_patch`, >=4 nokta gerektirir). Tek gri nokta
+# (yukarısı, §6.1 B) yalnızca parlaklık eksenini düzeltir; bu ek kanallar
+# ARASI karışımı da (ör. kırmızının yeşile sızması) düzeltebilir — ama bunu
+# YAPABİLMESİ için gerçekten FARKLI renklerde referans noktası gerekir,
+# aynı grinin tekrar örneklenmesi işe yaramaz (elle ölçüldü, bkz.
+# tests/device/results_2026-09-17.md: 5 noktalı gri ortalaması 1 noktadan
+# hiç daha iyi çıkmadı).
+EDGE_REFERENCE_COLORS: dict[str, RGB] = {
+    "gray": GRAY_REFERENCE_RGB,
+    "red": (205, 40, 40),
+    "green": (35, 150, 70),
+    "blue": (35, 95, 190),
+}
+
+
+def edge_patch_positions(matrix_size: int, *, border: int, colors: dict[str, RGB] | None = None) -> dict[str, tuple[int, int]]:
+    """Her adlandırılmış kenar yamasının SANAL (satır, sütun) konumu — üst
+    kenar şeridinde, çakışmayacak şekilde yan yana dizilir (en az
+    `EDGE_PATCH_SIZE + 2` modül aralıkla, ortalanmış)."""
+    colors = colors if colors is not None else EDGE_REFERENCE_COLORS
+    names = list(colors)
+    n = len(names)
+    row = -(border + EDGE_PATCH_MARGIN // 2 + 1)
+    step = EDGE_PATCH_SIZE + 2  # çakışmayı önlemek için yama genişliği + güvenlik payı
+    center_col = matrix_size // 2
+    start_col = center_col - (n - 1) * step // 2
+    return {name: (row, start_col + i * step) for i, name in enumerate(names)}

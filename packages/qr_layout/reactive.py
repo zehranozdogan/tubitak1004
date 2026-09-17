@@ -38,9 +38,22 @@ deneyle seçilebilir" — ARTIK KARŞILAŞTIRILDI:
     (B) A'ya göre belirgin bir avantajı YOK (bazen A daha iyi). AMA
     DOĞRUSAL OLMAYAN (gama/tonlama eğrisi — gerçek kameralarda/JPEG'de
     yaygın) bozulmada fark çarpıcı: A'da ΔE~10.7 (ciddi hata), B'de
-    ΔE~0.36. KARAR: kenar yaması yalnızca "gama benzeri kamera tepkisi
-    gerçek bir risk" ise ek baskı maliyetine değer — bu HENÜZ gerçek
-    fotoğrafla (§11 Aşama B) doğrulanmadı, sentetik kalıyor.
+    ΔE~0.36.
+  - İLK GERÇEK FOTOĞRAF TESTİ (tests/device/results_2026-09-17.md, ekrandan
+    çekim, henüz baskı değil): A/B 4-4 berabere — sentetik gama üstünlüğü
+    burada net görülmedi (muhtemelen ekran fotoğrafı kağıdın gerçek ışık
+    tepkisini temsil etmiyor). "1 griyi çoklu noktadan örnekleyip ortalamak"
+    da denendi — YARDIMCI OLMADI (kenar piksellerine yaklaşıp gürültü kattı).
+  - BUNUN ÜZERİNE: `edge_patch_positions()` + `render.render_with_edge_
+    reference_patches()` ile ÇOKLU FARKLI renk (§6.1 C) eklendi.
+    `benchmark_multicolor_reference.py`: A/B/C üç FARKLI bozulma türünde
+    karşılaştırıldı — HİÇBİRİ evrensel kazanan değil: doğrusal kaymada A
+    (ücretsiz, yeterli), gamada B, KANALLAR ARASI KARIŞIMDA (sensör
+    crosstalk, A/B'nin hiç modelleyemediği diyagonal-olmayan bozulma) C
+    açıkça kazanıyor (ΔE C=4.2 vs A=10.3/B=11.3). KARAR: hangi yöntemin
+    gerekli olduğu, gerçek kameranın HANGİ bozulma türüne daha çok maruz
+    kaldığına bağlı — bu hâlâ gerçek baskılı fotoğrafla (§11 Aşama B)
+    doğrulanmadı.
 
 "Üç layout" kutusu: yoğunluk (low/medium/high) kararı artık decode
 başarısı (bkz. aşağı) + RENK ÖLÇÜM KARARLILIĞI (`benchmark_color_

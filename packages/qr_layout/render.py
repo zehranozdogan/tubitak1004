@@ -12,8 +12,10 @@ from pathlib import Path
 from packages.qr_layout.colors import (
     EDGE_PATCH_MARGIN,
     EDGE_PATCH_SIZE,
+    EDGE_REFERENCE_COLORS,
     GRAY_REFERENCE_RGB,
     edge_gray_patch_position,
+    edge_patch_positions,
     module_color,
     module_pixel_center,
 )
@@ -105,6 +107,42 @@ def render_with_edge_gray_patch(qr, layout: dict, *, state: str | None = None, s
     draw.rectangle([cx - half, cy - half, cx + half - 1, cy + half - 1], fill=GRAY_REFERENCE_RGB)
 
     return img, (patch_row, patch_col)
+
+
+def render_with_edge_reference_patches(
+    qr, layout: dict, *, state: str | None = None, scale: int = 10, border: int = 4,
+    colors: dict | None = None,
+):
+    """`render_with_edge_gray_patch`'in genellenmişi — TEK gri yerine,
+    çoklu FARKLI renkte referans yaması basar (rapor §6.1 C: "3x3/çok
+    renkli düzeltme matrisi" — `calibration.multicolor_patch`, >=4 nokta
+    gerektirir; QR'ın kendi beyaz/siyahıyla birlikte bu >=2 ek renk yeterli).
+
+    Tek grinin (§6.1 B) YETERSİZLİĞİ elle ölçüldü: aynı grinin birden fazla
+    noktadan örneklenip ortalanması işe yaramadı (tests/device/results_
+    2026-09-17.md) — gerekli olan aynı rengin tekrarı değil, FARKLI
+    renklerdi. Bu fonksiyon onu sağlar.
+
+    `colors`: {isim: (r,g,b)} — None ise `colors.EDGE_REFERENCE_COLORS`.
+
+    Döner: (PIL.Image.Image, {isim: (satır, sütun), ...}).
+    """
+    colors = colors if colors is not None else EDGE_REFERENCE_COLORS
+    total_border = border + EDGE_PATCH_MARGIN
+    img = render_colored_image(qr, layout, state=state, scale=scale, border=total_border)
+
+    from PIL import ImageDraw
+
+    n = len(module_matrix(qr))
+    positions = edge_patch_positions(n, border=border, colors=colors)
+    half = (EDGE_PATCH_SIZE * scale) // 2
+
+    draw = ImageDraw.Draw(img)
+    for name, (row, col) in positions.items():
+        cy, cx = module_pixel_center(row, col, scale=scale, border=total_border)
+        draw.rectangle([cx - half, cy - half, cx + half - 1, cy + half - 1], fill=colors[name])
+
+    return img, positions
 
 
 def colored_png_bytes(qr, layout: dict, *, state: str | None = None, scale: int = 6, border: int = 2) -> bytes:
