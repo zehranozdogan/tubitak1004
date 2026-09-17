@@ -54,6 +54,16 @@ deneyle seçilebilir" — ARTIK KARŞILAŞTIRILDI:
     gerekli olduğu, gerçek kameranın HANGİ bozulma türüne daha çok maruz
     kaldığına bağlı — bu hâlâ gerçek baskılı fotoğrafla (§11 Aşama B)
     doğrulanmadı.
+  - 2. GERÇEK FOTOĞRAF TESTİ, 4 renkli etiketle (tests/device/results_
+    2026-09-17b.md): ÖNEMLİ VE BEKLENMEDİK bulgu — C, sentetikte kazanmasına
+    rağmen 2/4 gerçek fotoğrafta ÇÖKTÜ (ΔE ~49!). Sebep (doğrulandı, okuma
+    hatası değil): sadece 6 gürültülü noktayla düz `lstsq` afin fit kötü
+    koşullu oluyor, kalibrasyon noktalarının kapsadığı renk aralığının
+    dışında çılgınca ekstrapole ediyor. A (ücretsiz) 3 gerçek fotoğrafta da
+    en tutarlıydı. GÜNCEL KARAR: A/B varsayılan kalsın; C altyapısı hazır
+    ama daha fazla/iyi dağılmış nokta ya da düzenlileştirme (ridge
+    regression) olmadan ÜRETİME HAZIR DEĞİL — teorik üstünlük tek başına
+    yetmiyor, gerçek gürültüye dayanıklılık ayrı bir şart.
 
 "Üç layout" kutusu: yoğunluk (low/medium/high) kararı artık decode
 başarısı (bkz. aşağı) + RENK ÖLÇÜM KARARLILIĞI (`benchmark_color_
