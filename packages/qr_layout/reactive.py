@@ -27,17 +27,27 @@ Rapor §5.2'nin tam algoritması:
   4. en iyi layout'un layout_version ile sürümlenmesi
      -> `seed_from_layout_version()`: aynı sürüm = aynı yerleşim.
 
-RAPORDA AYRICA İSTENEN, HENÜZ EKSİK olan iki alt-madde (§5.2/5 ve "üç
-layout" kutusu):
-  - Kalibrasyon referansının "etiket kenarında" alternatifi hiç
-    denenmedi/karşılaştırılmadı — sadece "QR içi" (finder pattern, §6.1 D)
-    seçeneği var.
-  - Yoğunluk (low/medium/high) kararı artık decode başarısı (bkz. aşağı)
-    + RENK ÖLÇÜM KARARLILIĞI (`benchmark_color_stability.py` — medium'un
-    ΔE varyansı low/high'a göre belirgin daha düşük çıktı) + BASKI
-    UYGULANABİLİRLİĞİ (`benchmark_ecc_levels.py` part 4, geometrik hesap)
-    ile destekleniyor; ama baskı tarafı henüz fiziksel doğrulanmadı
-    (§11 Aşama B).
+§5.2/5 — kalibrasyon referansının "QR içinde veya etiket kenarında olması
+deneyle seçilebilir" — ARTIK KARŞILAŞTIRILDI:
+  - `colors.edge_gray_patch_position()` + `render.render_with_edge_gray_patch()`:
+    zorunlu quiet zone'un (§5.1) DIŞINA, ek bir gri referans yaması basar.
+  - `tests/synthetic/benchmark_edge_reference.py`: aynı sahte fotoğrafı hem
+    QR-içi-yalnız (A/D) hem QR-içi+kenar-yama (B, gri) ile kalibre edip
+    bilinen bir reaktif hücre renginden ΔE sapmasını ölçtü.
+  - BULGU: DOĞRUSAL renk kaymalarında (sarımsı/mavimsi ışık) ek yamanın
+    (B) A'ya göre belirgin bir avantajı YOK (bazen A daha iyi). AMA
+    DOĞRUSAL OLMAYAN (gama/tonlama eğrisi — gerçek kameralarda/JPEG'de
+    yaygın) bozulmada fark çarpıcı: A'da ΔE~10.7 (ciddi hata), B'de
+    ΔE~0.36. KARAR: kenar yaması yalnızca "gama benzeri kamera tepkisi
+    gerçek bir risk" ise ek baskı maliyetine değer — bu HENÜZ gerçek
+    fotoğrafla (§11 Aşama B) doğrulanmadı, sentetik kalıyor.
+
+"Üç layout" kutusu: yoğunluk (low/medium/high) kararı artık decode
+başarısı (bkz. aşağı) + RENK ÖLÇÜM KARARLILIĞI (`benchmark_color_
+stability.py` — medium'un ΔE varyansı low/high'a göre belirgin daha
+düşük çıktı) + BASKI UYGULANABİLİRLİĞİ (`benchmark_ecc_levels.py` part 4,
+geometrik hesap) ile destekleniyor; baskı tarafı henüz fiziksel
+doğrulanmadı (§11 Aşama B) — §5.2'nin son gerçek boşluğu bu.
 
 DOĞRULANDI (tests/synthetic/test_decode_verification.py + benchmark):
 üç yoğunluk × dört renk durumunun tamamı OpenCV/ArUco ile okunuyor. Reaktif

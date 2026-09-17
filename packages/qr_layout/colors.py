@@ -72,3 +72,29 @@ def finder_pattern_reference_pixels(*, scale: int, border: int) -> dict[str, tup
         "black": module_pixel_center(*FINDER_BLACK_MODULE, scale=scale, border=border),
         "white": module_pixel_center(*FINDER_WHITE_MODULE, scale=scale, border=border),
     }
+
+
+# --- Etiket kenarı referans yaması (rapor §5.2/5'in "QR içinde VEYA etiket
+# kenarında" alternatiflerinden ikincisi — bkz. render.py::render_with_
+# edge_gray_patch ve tests/synthetic/benchmark_edge_reference.py). ---
+#
+# QR-içi (yukarıdaki finder pattern) yöntemi sadece siyah/beyaz verebilir;
+# gerçek bir GRİ referans (§6.1 B: white_gray_black) için QR'ın DIŞINDA,
+# zorunlu quiet zone'un da dışında, ayrı bir baskı alanı gerekir.
+GRAY_REFERENCE_RGB: RGB = (128, 128, 128)
+EDGE_PATCH_MARGIN = 4  # zorunlu quiet zone'un dışında, SADECE yama için ek modül şeridi
+EDGE_PATCH_SIZE = 3  # yamanın modül cinsinden kare kenar uzunluğu
+
+
+def edge_gray_patch_position(matrix_size: int, *, border: int) -> tuple[int, int]:
+    """Gri yamanın SANAL (satır, sütun) konumu — üst kenar, ortalanmış,
+    `border` (gerçek/zorunlu quiet zone) modül kadar QR'dan uzakta BAŞLAYAN
+    EDGE_PATCH_MARGIN şeridinin ortasında. Gerçek bir QR modülü değildir;
+    `module_pixel_center` ve `sample_module_roi`, render/pipeline'da
+    kullanılan TOPLAM border (`border + EDGE_PATCH_MARGIN`) ile çağrılırsa
+    doğru pikseli verir — negatif satır bu yüzden çalışır, ayrı bir
+    koordinat sistemi gerekmez (rapor §10.1: okuyucu koordinatları
+    hard-code etmesin, hepsi aynı (satır, sütun) sözleşmesiyle
+    layout_version'da taşınabiliyor)."""
+    center_row = -(border + EDGE_PATCH_MARGIN // 2 + 1)
+    return (center_row, matrix_size // 2)

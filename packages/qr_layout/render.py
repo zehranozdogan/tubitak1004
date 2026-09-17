@@ -9,7 +9,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from packages.qr_layout.colors import module_color
+from packages.qr_layout.colors import (
+    EDGE_PATCH_MARGIN,
+    EDGE_PATCH_SIZE,
+    GRAY_REFERENCE_RGB,
+    edge_gray_patch_position,
+    module_color,
+    module_pixel_center,
+)
 from packages.qr_layout.generator import module_matrix
 
 
@@ -68,6 +75,36 @@ def render_colored_image(qr, layout: dict, *, state: str | None = None, scale: i
             draw.rectangle([x0, y0, x0 + scale - 1, y0 + scale - 1], fill=color)
 
     return img
+
+
+def render_with_edge_gray_patch(qr, layout: dict, *, state: str | None = None, scale: int = 10, border: int = 4):
+    """`render_colored_image` gibi, ama QR'ın DIŞINDA (zorunlu quiet zone'un
+    da dışında) ek bir gri referans yaması basar — rapor §5.2/5'in "QR içinde
+    VEYA etiket kenarında" alternatiflerinden ikincisi (bkz. colors.py'deki
+    EDGE_PATCH_* sabitleri ve edge_gray_patch_position).
+
+    `border` burada hâlâ GERÇEK/zorunlu quiet zone'un genişliği; yama için
+    ek `EDGE_PATCH_MARGIN` modül otomatik eklenir (yani QR'ın zorunlu
+    bölgeleri, §5.1, hiç değişmez — sadece etiket biraz daha büyür).
+
+    Döner: (PIL.Image.Image, yamanın sanal (satır, sütun) konumu). Konumu
+    `layout['reference_regions']['gray']`'e yazman gerekir ki okuyucu
+    hard-code etmesin (§10.1).
+    """
+    total_border = border + EDGE_PATCH_MARGIN
+    img = render_colored_image(qr, layout, state=state, scale=scale, border=total_border)
+
+    from PIL import ImageDraw
+
+    n = len(module_matrix(qr))
+    patch_row, patch_col = edge_gray_patch_position(n, border=border)
+    cy, cx = module_pixel_center(patch_row, patch_col, scale=scale, border=total_border)
+    half = (EDGE_PATCH_SIZE * scale) // 2
+
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([cx - half, cy - half, cx + half - 1, cy + half - 1], fill=GRAY_REFERENCE_RGB)
+
+    return img, (patch_row, patch_col)
 
 
 def colored_png_bytes(qr, layout: dict, *, state: str | None = None, scale: int = 6, border: int = 2) -> bytes:
