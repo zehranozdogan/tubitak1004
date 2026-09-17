@@ -8,8 +8,21 @@ from packages.qr_layout.function_mask import function_mask, matrix_size
 def generate_qr(payload: str, *, error: str = "h", version: int | None = None):
     """Standart bir QR üretir.
 
-    error='h' -> ECC-H (rapor §5: prototipte yüksek hata düzeltme; dağıtılmış
-    reaktif modüller için tampon sağlar). Dönen nesne segno.QRCode.
+    error='h' -> ECC-H. KARAR, rapor §5.2/4'ün istediği gibi DENEYSEL
+    karşılaştırmayla verildi (M/Q/H, bkz. tests/synthetic/benchmark_ecc_
+    levels.py), uydurulmadı:
+      - Aynı payload'da M en küçük QR'ı verir ama gerçek bozulma altında
+        (açı/bulanıklık/parlaklık) en düşük decode başarısını veriyor
+        (yüksek yoğunlukta %78, Q/H %82-85) VE kasıtlı-hata toleransı
+        SIFIR (§5.2/4'ün "intentional error" senaryosunda hiç işe yaramıyor).
+      - Q ile H, normal bozulmada birbirine yakın (bazen Q hafif önde);
+        ama H'nin kasıtlı-hata tolerans tavanı belirgin şekilde daha
+        yüksek (daha büyük QR = daha çok yedek kodkelime).
+      - Bedeli: H, M'ye göre daha büyük QR (aynı payload'da 69x69 vs 53x53
+        modül) — baskı alanı kritikse Q bir uzlaşma olabilir, ama şimdilik
+        önceliğimiz (kamera/gerçek fotoğraf altında) sağlamlık.
+    Dağıtılmış reaktif modüller için tampon sağlar (rapor §5). Dönen nesne
+    segno.QRCode.
     """
     import segno
 

@@ -21,7 +21,9 @@ Rapor §5.2'nin tam algoritması:
         kalibrasyon referansı, §6.1 B/C — kullanım kararı henüz alınmadı,
         alt yapı hazır). Kaç tanesinin güvenle tolere edilebileceği
         `tests/synthetic/benchmark_intentional_errors.py` ile DENEYSEL
-        ölçülür (ISO tablosundan uydurulmaz).
+        ölçülür (ISO tablosundan uydurulmaz). ECC Q/H VE boyut karşılaştırması
+        da yapıldı (`benchmark_ecc_levels.py`) — H'de karar kılındı, bkz.
+        `generator.generate_qr()` docstring'i (M/Q/H tam sayısal sonuçlar).
   4. en iyi layout'un layout_version ile sürümlenmesi
      -> `seed_from_layout_version()`: aynı sürüm = aynı yerleşim.
 
