@@ -1,6 +1,22 @@
 # tests/device — Basılı Etiket ve Telefon Testi (Rapor §11.2)
 
-Sahibi: Öğrenci 2 (§9.2). Kod değil; **test protokolü + log şeması + sonuç özetleri**.
+Sahibi: Öğrenci 2 (§9.2). Test protokolü + log şeması + sonuç özetleri +
+`run_test.py` (gerçek fotoğrafları `pipeline.analyze()`'dan geçirip bu
+şemadaki CSV'yi üreten araç).
+
+## Çalıştırma
+
+1. `manifest.example.csv`'yi `manifest.csv` olarak kopyala (bu, `.gitignore`'da —
+   kişisel dosya yolları commit'lenmez), fotoğraf yollarını ve bildiğin
+   meta verileri (telefon, ışık, mesafe, açı) doldur.
+2. `python tests/device/run_test.py tests/device/manifest.csv`
+3. Ham sonuç `tests/device/raw/results_*.csv`'ye yazılır (commit'lenmez);
+   toplu metrikler `tests/device/summary.csv`'ye eklenir (commit'lenir).
+
+`expected_state` (ground-truth) yalnızca `class_thresholds` tanımlı bir
+profille (ör. `DEMO_QR_STATE_COLORS_v1`) üretilmiş etiketlerde anlamlıdır
+— `GENIPIN_PUTRESIN_v2` gibi `class_thresholds: null` olan profillerde
+`freshness_class` hep boş döner, "doğruluk" hesaplanamaz.
 
 ## Test matrisi
 
