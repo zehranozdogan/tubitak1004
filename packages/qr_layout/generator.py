@@ -21,6 +21,11 @@ def generate_qr(payload: str, *, error: str = "h", version: int | None = None):
       - Bedeli: H, M'ye göre daha büyük QR (aynı payload'da 69x69 vs 53x53
         modül) — baskı alanı kritikse Q bir uzlaşma olabilir, ama şimdilik
         önceliğimiz (kamera/gerçek fotoğraf altında) sağlamlık.
+      - BASKI UYGULANABİLİRLİĞİ (aynı benchmark, 300dpi hesabıyla): H ile
+        69x69 modülün güvenli kalması (~modül başına >=0.4-0.5mm, genel
+        kural) için etiket en az ~30mm olmalı; 25mm'de modül 0.36mm'ye
+        düşüyor (riskli). Bu HENÜZ fiziksel baskıyla doğrulanmadı (§11
+        Aşama B), yalnızca yönlendirici bir hesap.
     Dağıtılmış reaktif modüller için tampon sağlar (rapor §5). Dönen nesne
     segno.QRCode.
     """

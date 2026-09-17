@@ -27,6 +27,18 @@ Rapor §5.2'nin tam algoritması:
   4. en iyi layout'un layout_version ile sürümlenmesi
      -> `seed_from_layout_version()`: aynı sürüm = aynı yerleşim.
 
+RAPORDA AYRICA İSTENEN, HENÜZ EKSİK olan iki alt-madde (§5.2/5 ve "üç
+layout" kutusu):
+  - Kalibrasyon referansının "etiket kenarında" alternatifi hiç
+    denenmedi/karşılaştırılmadı — sadece "QR içi" (finder pattern, §6.1 D)
+    seçeneği var.
+  - Yoğunluk (low/medium/high) kararı artık decode başarısı (bkz. aşağı)
+    + RENK ÖLÇÜM KARARLILIĞI (`benchmark_color_stability.py` — medium'un
+    ΔE varyansı low/high'a göre belirgin daha düşük çıktı) + BASKI
+    UYGULANABİLİRLİĞİ (`benchmark_ecc_levels.py` part 4, geometrik hesap)
+    ile destekleniyor; ama baskı tarafı henüz fiziksel doğrulanmadı
+    (§11 Aşama B).
+
 DOĞRULANDI (tests/synthetic/test_decode_verification.py + benchmark):
 üç yoğunluk × dört renk durumunun tamamı OpenCV/ArUco ile okunuyor. Reaktif
 hücre YOĞUNLUĞUNUN üst sınırı da elle taranarak belirlendi — bkz.

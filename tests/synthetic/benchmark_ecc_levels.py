@@ -125,10 +125,32 @@ def part3_intentional_error_tolerance() -> None:
     print()
 
 
+def part4_print_feasibility(versions: dict[str, int]) -> None:
+    """Baskı uygulanabilirliği (rapor §5.2 "üç layout" kutusu) — SAF GEOMETRİ:
+    modül sayısı x etiket boyutu -> modül başına mm. Bu bir decode/renk
+    ÖLÇÜMÜ değil, bir hesap; "güvenli modül boyutu" için genel kabul gören
+    mühendislik kuralı (~0.4-0.5mm+ telefon kamerasıyla tipik mesafede
+    güvenilir) referans alınır — KENDİ fiziksel baskı testimiz (§11 Aşama B)
+    henüz yapılmadığı için bu KESİN değil, sadece yönlendirici.
+    """
+    print("=== 4. Baskı uygulanabilirliği: modül başına mm (300 dpi, rapor s.12) ===")
+    dpi = 300
+    mm_per_inch = 25.4
+    label_sizes_mm = [25, 30, 40, 50]
+    print(f"{'ECC':5} {'modül':>6}  " + "  ".join(f"{s}mm" for s in label_sizes_mm))
+    for ecc, version in versions.items():
+        n = version * 4 + 17
+        cells = [f"{size / n:.3f}mm" for size in label_sizes_mm]
+        print(f"ECC-{ecc.upper():4} {n:>3}x{n:<3}  " + "  ".join(cells))
+    print("(~0.4-0.5mm altı, tipik telefon mesafesinde riskli sayılır — genel")
+    print(" kural, bizim doğrulanmış eşiğimiz değil; Aşama B ile teyit edilmeli.)\n")
+
+
 def main() -> None:
     versions = part1_qr_size()
     part2_distortion()
     part3_intentional_error_tolerance()
+    part4_print_feasibility(versions)
 
     print("=== YORUM ===")
     print(f"QR boyutu: M={versions['m']} < Q={versions['q']} < H={versions['h']} (aynı payload,")
