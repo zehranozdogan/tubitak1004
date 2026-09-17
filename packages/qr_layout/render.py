@@ -40,6 +40,10 @@ def render_colored_image(qr, layout: dict, *, state: str | None = None, scale: i
     """QR'ı rasterize eder; layout['sensor_modules'] koordinatlarını `state`
     rengiyle (None ise nötr gri), geri kalanını standart siyah/beyaz çizer.
 
+    `layout['intentional_errors']` (rapor §5.2/4) listesindeki modüller
+    GERÇEK bitlerinin TERSİYLE render edilir — QR'ın hata düzeltmesi (ECC)
+    bunu telafi etmesi beklenir (bkz. reactive.select_intentional_errors).
+
     Döner: PIL.Image.Image
     """
     from PIL import Image, ImageDraw
@@ -47,6 +51,7 @@ def render_colored_image(qr, layout: dict, *, state: str | None = None, scale: i
     matrix = module_matrix(qr)
     n = len(matrix)
     sensor_set = {tuple(rc) for rc in layout.get("sensor_modules", [])}
+    error_set = {tuple(rc) for rc in layout.get("intentional_errors", [])}
 
     size = (n + 2 * border) * scale
     img = Image.new("RGB", (size, size), "white")
@@ -55,6 +60,8 @@ def render_colored_image(qr, layout: dict, *, state: str | None = None, scale: i
     for r in range(n):
         for c in range(n):
             bit = matrix[r][c]
+            if (r, c) in error_set:
+                bit = 1 - bit  # kasıtlı hata: gerçek bitin tersini göster
             color = module_color(bit, (r, c) in sensor_set, state)
             x0 = (c + border) * scale
             y0 = (r + border) * scale

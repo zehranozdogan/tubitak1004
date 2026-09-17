@@ -16,8 +16,12 @@ Rapor §5.2'nin tam algoritması:
         %0->ArUco ile %67); bu skor o ölçüme dayanarak riskli bölgelerden
         kaçınıyor.
   3. kaçınılmazsa kontrollü "intentional error" + ECC/boyut deneysel karş.
-     -> hedef yoğunluğa min_spacing ile ulaşılamazsa spacing kademeli
-        gevşetilir (TODO: henüz uygulanmadı, şu an sabit spacing).
+     -> `select_intentional_errors()`: modülün GERÇEK bitinin tersiyle
+        render edilmesi gereken hücreleri seçer (ör. sabit renkli bir
+        kalibrasyon referansı, §6.1 B/C — kullanım kararı henüz alınmadı,
+        alt yapı hazır). Kaç tanesinin güvenle tolere edilebileceği
+        `tests/synthetic/benchmark_intentional_errors.py` ile DENEYSEL
+        ölçülür (ISO tablosundan uydurulmaz).
   4. en iyi layout'un layout_version ile sürümlenmesi
      -> `seed_from_layout_version()`: aynı sürüm = aynı yerleşim.
 
@@ -151,6 +155,61 @@ def select_reactive_modules(
     chosen: list[tuple[int, int]] = []
     for cell in pool:
         if len(chosen) >= target:
+            break
+        if all(_chebyshev(cell, c) >= min_spacing for c in chosen):
+            chosen.append(cell)
+    return sorted(chosen)
+
+
+def select_intentional_errors(
+    candidates: list[tuple[int, int]],
+    *,
+    count: int,
+    exclude: set[tuple[int, int]] | None = None,
+    min_spacing: int = 2,
+    seed: int = 0,
+) -> list[tuple[int, int]]:
+    """Kasıtlı olarak GERÇEK bitinin TERSİYLE render edilecek hücreleri seçer
+    (rapor §5.2/4: "Binary sınıf değişimi kaçınılmazsa kontrollü hata
+    modülleri").
+
+    Ne zaman gerekir: bir modülün QR'ın kendi verisinden bağımsız, SABİT bir
+    referans rengi göstermesi gerektiğinde (ör. §6.1 B/C'nin gri/çoklu-yama
+    kalibrasyon referansı — bu modüllerin gerçek biti '0' da olsa '1' de
+    olsa aynı sabit tonu göstermesi lazım). Reaktif hücrelerin aksine
+    (bkz. `colors.module_color` — HER ZAMAN gerçek bite göre ton seçer),
+    burada modülün GERÇEK sınıfı bilerek göz ardı edilir; QR'ın hata
+    düzeltmesi (ECC) bunu telafi etmeli.
+
+    Bu fonksiyon SADECE hangi hücrelerin seçileceğine karar verir — kaç
+    tanesinin güvenle tolere edilebileceği ISO/IEC 18004 tablosundan değil,
+    DENEYSEL olarak ölçülür (bkz. tests/synthetic/benchmark_intentional_
+    errors.py) çünkü modül-sayısı <-> kod kelimesi/ECC-bütçesi eşlemesi
+    QR'ın interleaving düzenine bağlıdır ve elle türetmek hataya açıktır.
+
+    `select_reactive_modules` ile AYNI güvenlik skorunu kullanır: hatalar
+    kenara/fonksiyon modüllerine yakın değil, dağılmış olsun — tek bir
+    Reed-Solomon bloğunda kümelenip o bloğun düzeltme kapasitesini aşma
+    riskini azaltır. `exclude` ile reaktif hücrelerle çakışma engellenir
+    (bir modül aynı anda hem reaktif hem kasıtlı-hata OLAMAZ).
+    """
+    exclude = exclude or set()
+    pool = [cell for cell in candidates if cell not in exclude]
+    if count > len(pool):
+        raise ValueError(
+            f"count ({count}) dışlananlar sonrası aday havuzundan ({len(pool)}) büyük olamaz."
+        )
+
+    candidate_set = set(candidates)
+    n = max(max(r, c) for r, c in candidates) + 1
+    func_dist = _function_distance_transform(candidate_set, n)
+
+    rnd = random.Random(seed)
+    ranked = sorted(pool, key=lambda cell: (-_safety_score(cell, func_dist, n), rnd.random()))
+
+    chosen: list[tuple[int, int]] = []
+    for cell in ranked:
+        if len(chosen) >= count:
             break
         if all(_chebyshev(cell, c) >= min_spacing for c in chosen):
             chosen.append(cell)
