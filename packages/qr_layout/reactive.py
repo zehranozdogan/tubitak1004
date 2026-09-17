@@ -50,20 +50,20 @@ deneyle seçilebilir" — ARTIK KARŞILAŞTIRILDI:
     karşılaştırıldı — HİÇBİRİ evrensel kazanan değil: doğrusal kaymada A
     (ücretsiz, yeterli), gamada B, KANALLAR ARASI KARIŞIMDA (sensör
     crosstalk, A/B'nin hiç modelleyemediği diyagonal-olmayan bozulma) C
-    açıkça kazanıyor (ΔE C=4.2 vs A=10.3/B=11.3). KARAR: hangi yöntemin
-    gerekli olduğu, gerçek kameranın HANGİ bozulma türüne daha çok maruz
-    kaldığına bağlı — bu hâlâ gerçek baskılı fotoğrafla (§11 Aşama B)
-    doğrulanmadı.
-  - 2. GERÇEK FOTOĞRAF TESTİ, 4 renkli etiketle (tests/device/results_
-    2026-09-17b.md): ÖNEMLİ VE BEKLENMEDİK bulgu — C, sentetikte kazanmasına
-    rağmen 2/4 gerçek fotoğrafta ÇÖKTÜ (ΔE ~49!). Sebep (doğrulandı, okuma
-    hatası değil): sadece 6 gürültülü noktayla düz `lstsq` afin fit kötü
-    koşullu oluyor, kalibrasyon noktalarının kapsadığı renk aralığının
-    dışında çılgınca ekstrapole ediyor. A (ücretsiz) 3 gerçek fotoğrafta da
-    en tutarlıydı. GÜNCEL KARAR: A/B varsayılan kalsın; C altyapısı hazır
-    ama daha fazla/iyi dağılmış nokta ya da düzenlileştirme (ridge
-    regression) olmadan ÜRETİME HAZIR DEĞİL — teorik üstünlük tek başına
-    yetmiyor, gerçek gürültüye dayanıklılık ayrı bir şart.
+    açıkça kazanıyor (ΔE C=0.26 vs A=10.3/B=11.3 — bkz. düzeltme notu
+    aşağıda). KARAR: hangi yöntemin gerekli olduğu, gerçek kameranın HANGİ
+    bozulma türüne daha çok maruz kaldığına bağlı — bu hâlâ gerçek baskılı
+    fotoğrafla (§11 Aşama B) doğrulanmadı.
+  - 2. GERÇEK FOTOĞRAF TESTİ, 4 renkli etiketle: İLK ÖLÇÜMDE (tests/device/
+    results_2026-09-17b.md) "C 2/4 fotoğrafta ÇÖKTÜ (ΔE~49)" denmişti —
+    bu YANLIŞTI, DÜZELTİLDİ (tests/device/results_2026-09-17c.md): sebep
+    gerçek bir kalibrasyon zayıflığı değil, test scriptimdeki bir RGB/BGR
+    kanal sırası hatasıydı (A/B'nin simetrik beyaz/gri/siyah renkleri
+    hatayı gizlemişti, C'nin asimetrik kırmızı/yeşil/mavisi ortaya
+    çıkardı). Düzeltilince C makul sonuçlar verdi (A=2,B=1,C=1 kazanma,
+    hiçbiri çökmedi). GÜNCEL DURUM: küçük örneklemde (4 fotoğraf) net bir
+    kazanan yok; C'nin sentetik kanal-karışımı üstünlüğü GEÇERLİ. Daha
+    büyük örneklem / gerçek baskı ile netleştirilmeli.
 
 "Üç layout" kutusu: yoğunluk (low/medium/high) kararı artık decode
 başarısı (bkz. aşağı) + RENK ÖLÇÜM KARARLILIĞI (`benchmark_color_

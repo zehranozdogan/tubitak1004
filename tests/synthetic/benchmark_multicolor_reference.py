@@ -143,8 +143,18 @@ def main() -> None:
             {"white": tuple(white_ref), "gray": tuple(patch_measurements["gray"]), "black": tuple(black_ref)},
             known_rc, true_rgb,
         )
+        # ÖNEMLİ: `canonical` BGR sıradadır (bu dosyadaki her şey gibi); "true"
+        # noktalar da AYNI (BGR) sırada verilmeli — yoksa fit BGR->RGB öğrenir,
+        # ama _measure() çıktıyı YİNE BGR->RGB diye çevirdiği için (aslında
+        # zaten RGB olan bir şeyi tekrar ters çevirir) kanallar karışır. Elle
+        # bulundu (bkz. tests/device/results_2026-09-17c.md).
+        def _to_bgr(rgb: tuple[int, int, int]) -> tuple[int, int, int]:
+            return (rgb[2], rgb[1], rgb[0])
+
         captured = [tuple(white_ref), tuple(black_ref)] + [tuple(v) for v in patch_measurements.values()]
-        true_points = [(255, 255, 255), (0, 0, 0)] + [EDGE_REFERENCE_COLORS[k] for k in patch_measurements]
+        true_points = [_to_bgr((255, 255, 255)), _to_bgr((0, 0, 0))] + [
+            _to_bgr(EDGE_REFERENCE_COLORS[k]) for k in patch_measurements
+        ]
         de_c = _measure(
             canonical, "multicolor_patch", {"captured": captured, "true": true_points}, known_rc, true_rgb,
         )
