@@ -32,12 +32,12 @@
     },
     "reference_regions": {
       "type": "object",
-      "description": "Sabit, reaktif OLMAYAN referans noktalari (§6.1 kod: qr_fixed_regions).",
+      "description": "Sabit, reaktif OLMAYAN referans noktalari (§6.1 kod: qr_fixed_regions=QR-ici / white_gray_black,multicolor_patch=etiket kenari). NEGATIF koordinat gecerlidir: etiket kenari yamalari (§5.2/5) QR modul izgarasinin DISINDA, zorunlu quiet zone'un otesinde bir sanal konumu (satir<0) ifade eder (bkz. qr_layout/colors.py::edge_patch_positions). sensor_modules'un aksine 0'la sinirli DEGIL.",
       "additionalProperties": {
         "type": "array",
         "items": {
           "type": "array",
-          "items": { "type": "integer", "minimum": 0 },
+          "items": { "type": "integer" },
           "minItems": 2,
           "maxItems": 2
         }

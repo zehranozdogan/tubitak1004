@@ -25,7 +25,7 @@ from packages.qr_layout import (
     select_reactive_modules,
 )
 from packages.qr_layout.colors import STATE_LABELS
-from packages.qr_layout.render import colored_png_bytes
+from packages.qr_layout.render import label_png_bytes
 from packages.ui_kit import theme as T
 from packages.ui_kit.components import (
     app_header,
@@ -81,6 +81,13 @@ def _to_iso_date(value: str) -> str:
 def admin_body(page: ft.Page, nav) -> ft.Control:
     profiles = load_sensor_profiles()
     layouts = load_layout_versions()
+
+    def _selected_profile(profile_id: str) -> dict | None:
+        # Seçili sensor_profile_id'nin GERÇEK dosyasını bulur (sadece ID
+        # string'i değil) — render_label_image bunun calibration_method.code'una
+        # bakıp gerekiyorsa referans yaması (§6.1 B/C) basar. Bulunamazsa None
+        # (render_label_image bunu QR-içi/A-D varsayılanına düşürür).
+        return next((p for p in profiles if p.get("profile_id") == profile_id), None)
 
     label_count_card, label_count_text = stat_card_live(
         "Üretilen etiket", count_labels(OUT_DIR)
@@ -186,48 +193,58 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
             status.value = f"Geçersiz girdi: {ex}"
             page.update()
             return
+        sensor_profile = _selected_profile(sensor_profile_id.value)
         # Nötr gri = reaktif hücrelerin yerleşimi; henüz bir tazelik durumu değil.
+        # label_png_bytes: sensor_profile'ın kalibrasyon yöntemi (§6.1 B/C) ek
+        # referans yaması istiyorsa önizlemede de gösterir — gerçek çıktıyla aynı.
         preview_frame.content = ft.Image(
-            src=base64.b64encode(colored_png_bytes(qr, layout, state=None)).decode(),
+            src=base64.b64encode(label_png_bytes(qr, layout, sensor_profile, state=None)).decode(),
             fit=ft.BoxFit.CONTAIN,
         )
         n = 4 * qr.version + 17
+        calibration_code = ((sensor_profile or {}).get("calibration_method") or {}).get("code", "white_black")
         meta_col.controls = [
             kv("Parti no", payload["product_id"]),
             kv("QR versiyonu", f"v{qr.version}"),
             kv("Modül", f"{n} × {n}"),
             kv("Reaktif modül", len(modules)),
             kv("ECC", "H"),
+            kv("Kalibrasyon", calibration_code),
         ]
         status.value = "Gri noktalar = reaktif sensör hücreleri. 'Etiketi oluştur' ile dosyaları üret."
         page.update()
 
     def do_export(_e) -> None:
         preview_card.visible = True
+        sensor_profile = _selected_profile(sensor_profile_id.value)
         try:
             payload = _payload()
-            result = export_label(payload, OUT_DIR, density=density.value or "low")
+            result = export_label(
+                payload, OUT_DIR, density=density.value or "low", sensor_profile=sensor_profile
+            )
         except Exception as ex:  # noqa: BLE001
             status.value = f"Hata: {ex}"
             page.update()
             return
         qr, layout = result["qr"], result["layout"]
         preview_frame.content = ft.Image(
-            src=base64.b64encode(colored_png_bytes(qr, layout, state=None)).decode(),
+            src=base64.b64encode(label_png_bytes(qr, layout, sensor_profile, state=None)).decode(),
             fit=ft.BoxFit.CONTAIN,
         )
+        calibration_code = ((sensor_profile or {}).get("calibration_method") or {}).get("code", "white_black")
         meta_col.controls = [
             kv("Parti no", payload["product_id"]),
             kv("QR versiyonu", f"v{qr.version}"),
             kv("Matris", layout["matrix_size"]),
             kv("Reaktif modül", len(layout["sensor_modules"])),
             kv("Yoğunluk", layout["module_density"]),
+            kv("Kalibrasyon", calibration_code),
         ]
         def _state_thumb(state_key: str, label: str) -> ft.Control:
             # Bu Flet sürümünde ayrı bir src_base64 alanı yok; base64 metni
             # doğrudan src'ye yazılır (bkz. ft.Image docstring: "A base64 string").
             b64 = base64.b64encode(
-                colored_png_bytes(qr, layout, state=state_key, scale=8, border=1)
+                label_png_bytes(qr, layout, sensor_profile, state=state_key, scale=8, border=1)
             ).decode()
             img = ft.Image(src=b64, width=130, height=130, fit=ft.BoxFit.CONTAIN)
             return ft.Column(

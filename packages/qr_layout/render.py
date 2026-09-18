@@ -145,6 +145,70 @@ def render_with_edge_reference_patches(
     return img, positions
 
 
+# sensor_profile.calibration_method.code -> hangi render fonksiyonu (rapor
+# §6.1). "white_black"/"qr_fixed_regions"/"algorithmic_white_balance" (A/D/E)
+# ek yama gerektirmiyor (QR'ın kendi finder pattern'i yeterli); "white_gray_
+# black" (B) 1 gri, "multicolor_patch" (C) çoklu renk kenar yaması ister —
+# bkz. docs/decisions/0004-calibration-method-choice.md.
+_NEEDS_GRAY_PATCH = "white_gray_black"
+_NEEDS_MULTICOLOR_PATCH = "multicolor_patch"
+
+
+def render_label_image(qr, layout: dict, sensor_profile: dict | None, *, state: str | None = None, scale: int = 10, border: int = 4):
+    """`sensor_profile['calibration_method']['code']`'a göre doğru render
+    yolunu seçer (rapor §6.1 A-E) VE gerekliyse `layout['reference_regions']`'a
+    ek referans konumlarını YAZAR (in-place) — böylece üretilen dosya
+    gerçekten o kalibrasyon yönteminin ihtiyacı olan yamayı taşır ve okuyucu
+    koordinatları hard-code etmez (§10.1). `sensor_profile` None ise (veya
+    kod tanınmıyorsa) QR-içi (A/D) davranışına düşer — geriye dönük uyumlu.
+
+    Döner: PIL.Image.Image.
+    """
+    code = ((sensor_profile or {}).get("calibration_method") or {}).get("code", "white_black")
+
+    if code == _NEEDS_GRAY_PATCH:
+        img, pos = render_with_edge_gray_patch(qr, layout, state=state, scale=scale, border=border)
+        layout.setdefault("reference_regions", {})["gray"] = [list(pos)]
+        return img
+
+    if code == _NEEDS_MULTICOLOR_PATCH:
+        img, positions = render_with_edge_reference_patches(qr, layout, state=state, scale=scale, border=border)
+        refs = layout.setdefault("reference_regions", {})
+        for name, p in positions.items():
+            refs[name] = [list(p)]
+        return img
+
+    return render_colored_image(qr, layout, state=state, scale=scale, border=border)
+
+
+def label_png_bytes(qr, layout: dict, sensor_profile: dict | None, *, state: str | None = None, scale: int = 6, border: int = 2) -> bytes:
+    """`colored_png_bytes` gibi ama `render_label_image` üzerinden — önizleme
+    de gerçek üretimle (referans yamaları dahil) birebir aynı görünsün diye."""
+    import io
+
+    buf = io.BytesIO()
+    render_label_image(qr, layout, sensor_profile, state=state, scale=scale, border=border).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def save_synthetic_states_for_profile(
+    qr, layout: dict, out_dir: str | Path, *, stem: str, sensor_profile: dict | None,
+    scale: int = 10, border: int = 4,
+) -> dict[str, Path]:
+    """`save_synthetic_states` ile AYNI, ama `sensor_profile`'ın kalibrasyon
+    yönteminin (§6.1 B/C) ihtiyacı olan referans yamalarını da basar ve
+    `layout['reference_regions']`'ı günceller. `sensor_profile` None/A-D-E
+    ise `save_synthetic_states` ile birebir aynı çıktıyı üretir."""
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    paths: dict[str, Path] = {}
+    for state in ("fresh", "transition", "spoiled"):
+        p = out / f"{stem}.state_{state}.png"
+        render_label_image(qr, layout, sensor_profile, state=state, scale=scale, border=border).save(p)
+        paths[state] = p
+    return paths
+
+
 def colored_png_bytes(qr, layout: dict, *, state: str | None = None, scale: int = 6, border: int = 2) -> bytes:
     """Önizleme için renkli PNG baytları (ör. Flet ft.Image.src (base64))."""
     import io

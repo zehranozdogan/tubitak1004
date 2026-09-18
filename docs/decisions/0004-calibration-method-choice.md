@@ -61,6 +61,17 @@ fotoğraf setiyle (§11 Aşama B) sonuç değişirse bu dosya güncellenecek.
 
 ## Sonraki adım
 
+- [x] **(18 Eylül)** B/C artık gerçek üretim akışına bağlı —
+      `export_label(..., sensor_profile=...)` ve Yönetici ekranı,
+      `sensor_profile.calibration_method.code`'a bakıp gerekli referans
+      yamasını (gri/çoklu-renk) gerçekten basıyor ve `layout_version.json`'a
+      yazıyor (`render.render_label_image` / `save_synthetic_states_for_
+      profile`). Önceden bu yalnızca deney scriptlerinde vardı; danışman
+      A dışında bir yöntem seçerse artık KOD DEĞİŞİKLİĞİ GEREKMEDEN, sadece
+      profildeki `calibration_method.code` değiştirilerek üretilebilir.
+      Bu sırada bir şema hatası da bulunup düzeltildi: `layout_version.
+      schema.json`'daki `reference_regions` alanı negatif koordinatlara
+      (kenar yaması için gerekli) izin vermiyordu.
 - [ ] Gerçek BASILI etiketle (ekran değil) tekrar test — mevcut ekran
       testlerinin baskıyı temsil edip etmediği hâlâ belirsiz.
 - [ ] Örneklem büyütülmeli (şu an toplam 12 gerçek fotoğraf, 4-8 arası turlarda).
