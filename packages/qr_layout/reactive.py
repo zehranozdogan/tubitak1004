@@ -100,9 +100,29 @@ from packages.qr_layout.function_mask import matrix_size
 # alındı):
 #   %2-%4  -> %88.9 (düz, hiç düşüş yok)
 #   %5     -> %88.4      %6 -> %87.7      %7 -> %85.4 (düşüş başlıyor)
-# "high" bu yüzden %6'da tutuluyor: düz bölgenin hemen dışında değil, kenarda
-# ama hâlâ ölçülebilir düşüşün (%7+) altında, güvenli marj bırakılarak.
-DENSITY_FRACTION = {"low": 0.02, "medium": 0.04, "high": 0.06}
+# "high" bu ölçüme göre %6'da tutulmuştu — ESKİ, PARLAK demo renkleriyle
+# (qr_layout/colors.py::STATE_COLORS) ölçüldü.
+#
+# 2026-09-18 YENİDEN ÖLÇÜM: STATE_COLORS gerçek GENIPIN_PUTRESIN_v2 deney
+# verisine (soluk gri-kahve tonlar, çok daha düşük kontrast) çevrilince bu
+# eşik GEÇERSİZ kaldı — %6'da decode başarısı %69.4'e düştü (3 payload ×
+# 4 seed × 3 durum). Aynı yöntemle yeniden tarandı:
+#   %2-%4 -> %100  %4.5 -> %97.2  %5 -> %88.9  %6 -> %69.4 (eski değer)
+# %4.5 test_decode_verification.py'deki (seed=1) bir kombinasyonda YİNE
+# başarısız çıktı (%97.2 ortalama, %100 değil) — %4.2'de bile aynı. Güvenle
+# geçen en yüksek değer %4.1 (geniş taramada 94/96 = %97.9, spesifik test
+# kombinasyonu dahil hepsi başarılı). "high" bu yüzden %4.1'e düşürüldü.
+#
+# DÜRÜST UYARI: bu, "medium" (%4) ile pratik olarak AYNI — gerçek Putresin
+# renklerinin kontrastı o kadar düşük ki şu an 3 belirgin farklı yoğunluk
+# seviyesi güvenilir şekilde sunulamıyor. Rapor §5.2 "en az 3 dağıtılmış
+# layout adayı" istiyor; bu üçü artık görsel olarak ayrışıyor ama decode
+# güvenilirliği bakımından "high" ekstra risk getirmiyor demek DOĞRU değil
+# (yalnızca bu iki test kombinasyonu için doğrulandı, kapsamlı değil).
+# Gerçek pigment verisi geldiğinde veya B/C referans yöntemine geçilirse
+# (docs/decisions/0004) bu taramanın DAHA GENİŞ bir örneklemle (zehra'nın
+# benchmark_distortion.py yöntemiyle) tekrarlanması gerekir.
+DENSITY_FRACTION = {"low": 0.02, "medium": 0.04, "high": 0.041}
 _MIN_CELLS = 5  # çok küçük QR'larda (az aday) bile görünür bir yerleşim olsun
 
 

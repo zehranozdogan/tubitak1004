@@ -2,12 +2,12 @@
   "profile_id": "DEMO_QR_STATE_COLORS_v1",
   "analyte_axis": "demo_state_index",
   "scale_points": [
-    { "value": 0.0, "rgb": [0, 140, 40],    "lab": [50.58, -52.84, 42.50], "state": "fresh" },
-    { "value": 0.1, "rgb": [140, 255, 160], "lab": [91.52, -52.11, 35.49], "state": "fresh" },
-    { "value": 1.0, "rgb": [185, 90, 0],    "lab": [49.04, 34.20, 58.03],  "state": "transition" },
-    { "value": 1.1, "rgb": [255, 185, 90],  "lab": [80.01, 16.12, 56.94],  "state": "transition" },
-    { "value": 2.0, "rgb": [210, 0, 0],     "lab": [43.81, 69.18, 58.05],  "state": "spoiled" },
-    { "value": 2.1, "rgb": [255, 140, 140], "lab": [70.81, 43.36, 19.56],  "state": "spoiled" }
+    { "value": 0.0, "rgb": [214, 205, 196], "lab": [82.88, 1.56, 5.59],   "state": "fresh" },
+    { "value": 0.1, "rgb": [193, 176, 160], "lab": [72.84, 3.44, 10.41],  "state": "fresh" },
+    { "value": 1.0, "rgb": [150, 128, 112], "lab": [55.17, 5.82, 11.81],  "state": "transition" },
+    { "value": 1.1, "rgb": [110, 92, 84],   "lab": [40.59, 5.92, 7.33],   "state": "transition" },
+    { "value": 2.0, "rgb": [78, 66, 66],    "lab": [29.18, 5.14, 1.91],   "state": "spoiled" },
+    { "value": 2.1, "rgb": [54, 50, 58],    "lab": [21.47, 3.64, -4.40],  "state": "spoiled" }
   ],
   "calibration_method": {
     "code": "white_black",

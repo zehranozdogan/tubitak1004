@@ -6,9 +6,15 @@ rengin gri-seviye/binary davranışını incele... orijinal siyah/beyaz
 sınıfını değiştirmeyen pozisyonlara yerleştir"). Bu yüzden her durum için
 İKİ ton tanımlanır: bit=1 (koyu modül) → 'dark', bit=0 (açık modül) → 'light'.
 
-DEĞERLER TASLAK: gerçek pigment renkleri Putresin deney verilerine göre
-kalibre edilecek (rapor §4, §6). Şimdilik görsel ayrım + demo içindir;
-gerçek decodability testi tests/synthetic altında ayrıca doğrulanmalı.
+DEĞERLER: `packages/profile_schema/examples/GENIPIN_PUTRESIN_v2.sensor_profile.json`
+scale_points'inden türetildi — gerçek Putresin deney fotoğraflarına dayanan
+renkler (rapor §4: "Putresin çözeltilerinden elde edilen renkler.pptx"),
+uydurma/keyfi demo renkleri DEĞİL. 6 nokta (0.03125..1.0 mM), en soluk ikisi
+fresh, ortadaki ikisi transition, en koyu ikisi spoiled'a eşlendi — her
+durumda daha düşük konsantrasyon = 'light', daha yüksek = 'dark' (bit
+sınıfına göre, kimyasal anlam değil). Decodability
+tests/synthetic/test_decode_verification.py ile doğrulanır (bu dosyayı
+her değiştirdiğinde o test paketini tekrar çalıştır).
 """
 
 RGB = tuple[int, int, int]
@@ -20,9 +26,9 @@ STATE_LABELS = {
 }
 
 STATE_COLORS: dict[str, dict[str, RGB]] = {
-    "fresh": {"dark": (0, 140, 40), "light": (140, 255, 160)},
-    "transition": {"dark": (185, 90, 0), "light": (255, 185, 90)},
-    "spoiled": {"dark": (210, 0, 0), "light": (255, 140, 140)},
+    "fresh": {"light": (214, 205, 196), "dark": (193, 176, 160)},       # 0.03125 / 0.0625 mM
+    "transition": {"light": (150, 128, 112), "dark": (110, 92, 84)},    # 0.125 / 0.25 mM
+    "spoiled": {"light": (78, 66, 66), "dark": (54, 50, 58)},           # 0.5 / 1.0 mM
 }
 
 # Henüz bir duruma atanmamış / yalnızca yerleşimi göstermek için nötr gri.
