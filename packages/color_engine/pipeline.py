@@ -9,10 +9,17 @@ sabit bölgeye dokunmaz, §5.1). Eski/elle kurulmuş layout_version'larda bu
 alan yoksa QR sabitlerine düşülür (geriye dönük uyumluluk).
 
 Bilinen sınırlama: gri/çoklu-yama referansı gerektiren yöntemler (B, C)
-hâlâ `white_black`'e (A) düşer — bunlar ya fiziksel ek baskı yaması ya da
-kasıtlı hata modülü (`intentional_errors`, §5.2/4, henüz uygulanmadı)
-gerektiriyor; `confidence` için de henüz doğrulanmış bir formül yok
-(None döner).
+hâlâ `white_black`'e (A) düşer (üretici tarafı artık bunları basıyor —
+bkz. qr_layout/render.py::render_label_image — ama OKUYUCU/bu dosya henüz
+kullanmıyor; ayrı bir iş).
+
+`confidence` (18 Eylül eklendi): reaktif modül okumalarının BİRBİRİYLE NE
+KADAR TUTARLI olduğuna dayanır (her modülün temsilci/median renkten ΔE
+sapması). DAYANAK — uydurulmadı, ölçüldü (64 sentetik açı×bulanıklık×
+parlaklık kombinasyonu, DEMO_QR_STATE_COLORS_v1 ile): doğru sınıflandırılan
+sonuçlarda ortalama sapma 7.54 (n=51), YANLIŞ sınıflandırılanlarda 19.34
+(n=13) — net bir ayrım var, mükemmel değil (orta bantta örtüşme var, bu
+YANSITILIYOR: confidence orada da orta değer verir, uçlara zıplamaz).
 """
 
 from __future__ import annotations
@@ -20,7 +27,7 @@ from __future__ import annotations
 import numpy as np
 
 from packages.color_engine import calibration
-from packages.color_engine.colorspace import rgb_to_lab
+from packages.color_engine.colorspace import delta_e, rgb_to_lab
 from packages.color_engine.homography import warp_to_canonical
 from packages.color_engine.matching import match_profile_point
 from packages.color_engine.quality import quality_score, should_rescan
@@ -39,6 +46,32 @@ _CANONICAL_BORDER = 4
 # reference_regions dolmadan doğrudan (yalnızca beyaz/siyah referansla)
 # çalışabilen yöntemler. Diğerleri (B, C, learned) white_black'e düşer.
 _SUPPORTED_WITHOUT_EXTRA_REFERENCES = {"white_black", "qr_fixed_regions", "algorithmic_white_balance"}
+
+# confidence formülü için doygunluk noktası: modül-okuma sapması (ΔE, bkz.
+# _module_reading_confidence) bu değere ULAŞTIĞINDA confidence 0'a iner.
+# ELLE ÖLÇÜLDÜ (modül başlığındaki not) — uydurulmadı: 64 sentetik test
+# kombinasyonunda doğru sonuçlar ort. 7.5, yanlışlar ort. 19.3 sapma
+# veriyordu; 20 bu ikisinin arasında, yanlışların sınırına yakın bir eşik.
+_SPREAD_SATURATING_DELTA_E = 20.0
+
+
+def _module_reading_confidence(module_readings: list[ModuleReading], representative_lab) -> float:
+    """0..1: reaktif modül okumaları BİRBİRİYLE ne kadar tutarlı (düşük
+    sapma = yüksek güven). Her modülün temsilci (median) renkten ΔE
+    sapmasının ortalamasını alıp `_SPREAD_SATURATING_DELTA_E`'ye göre
+    normalize eder. Tek modüllü bir layout'ta anlamsızca hep 1.0 döner
+    (sapma tanımı gereği sıfır) — pratikte `_MIN_CELLS>=5` (qr_layout/
+    reactive.py) olduğu için bu durum beklenmez.
+
+    NOT: TEMİZ (bozulmasız) bir görüntüde bile sapma tam 0 OLMAZ — aynı
+    durumun (ör. 'fresh') kendi içinde koyu/açık iki tonu var (module_color,
+    §5.2/3, QR bitine göre); bu YAPISAL bir taban gürültüdür, kalibrasyon
+    verisine zaten dahildir (ölçülen en temiz durumda bile sapma ~3.4-4.7)."""
+    if not module_readings:
+        return 0.0
+    spreads = [delta_e(m.lab, representative_lab) for m in module_readings]
+    mean_spread = float(np.mean(spreads))
+    return max(0.0, min(1.0, 1.0 - mean_spread / _SPREAD_SATURATING_DELTA_E))
 
 
 def _rescan_result(quality: float, note: str) -> ColorEngineResult:
@@ -136,7 +169,7 @@ def analyze(
         matched_profile_point=match["matched_profile_point"],
         freshness_class=match["freshness_class"],
         technical_level=match["technical_level"],
-        confidence=None,  # TODO: doğrulanmış bir güven skoru formülü henüz yok
+        confidence=_module_reading_confidence(module_readings, representative_lab),
         module_readings=module_readings,
         notes=notes,
     )
