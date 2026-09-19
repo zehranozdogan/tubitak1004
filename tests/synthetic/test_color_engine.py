@@ -114,9 +114,10 @@ def test_analyze_recommends_rescan_when_no_qr_detected():
 
 
 def test_analyze_falls_back_to_white_black_for_unsupported_calibration_method():
-    """multicolor_patch, layout_version.reference_regions doldurulmadığı
-    için henüz desteklenmiyor; çökmek yerine white_black'e düşüp notta
-    bunu açıklamalı."""
+    """multicolor_patch DESTEKLENİYOR (bkz. test_pipeline_reference_
+    wiring.py) ama bu testteki layout'ta (elle kurulmuş, reference_regions
+    hiç yok) gerekli >=4 noktayı sağlayamıyor; çökmek yerine white_black'e
+    düşüp notta bunu açıklamalı."""
     photo, layout = _render_photo("TEST-PIPELINE-3", "fresh", n_sensor_modules=5)
     profile = _profile_for_state("fresh", with_thresholds=False)
     profile["calibration_method"] = {"code": "multicolor_patch"}
