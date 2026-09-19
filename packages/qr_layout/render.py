@@ -1,6 +1,12 @@
 """QR / etiket görsel çıktısı (rapor §8: basılabilir PNG/PDF + sentetik durumlar).
 
-save_png / save_pdf / png_bytes : düz siyah-beyaz QR (segno, basılabilir dosya).
+save_png / save_pdf / png_bytes : DÜZ siyah-beyaz QR (segno) — yalnızca "bu
+    QR taşınabilir/okunabilir mi" diye ham bir referans; reaktif hücreleri
+    veya kalibrasyon referans yamalarını GÖSTERMEZ.
+save_label_png / save_label_pdf : rapor sayfa 12'deki asıl "Basılabilir
+    etiket PNG/PDF" çıktısı — gerçek fiziksel etiketin basılı hâlini
+    (reaktif hücreler NÖTR/henüz reaksiyona girmemiş tonda + varsa §6.1 B/C
+    referans yamaları dahil) gösterir. export_label() bunu kullanır.
 render_colored_image ve türevleri : reaktif hücrelerin RENKLİ gösterimi (Pillow) —
     her modülün açık/koyu sınıfı korunur ki QR hâlâ okunabilir kalsın (§5.2/3).
 """
@@ -33,6 +39,34 @@ def save_pdf(qr, path: str | Path, *, scale: int = 10, border: int = 4) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     qr.save(str(path), kind="pdf", scale=scale, border=border)
+    return path
+
+
+def save_label_png(
+    qr, layout: dict, sensor_profile: dict | None, path: str | Path, *, scale: int = 10, border: int = 4,
+) -> Path:
+    """Rapor s.12: "Basılabilir etiket PNG (300 dpi)" — GERÇEK fiziksel
+    etiketi gösterir: reaktif hücreler nötr/henüz reaksiyona girmemiş
+    tonda (henüz bir tazelik durumu YOK, ürün daha üretim hattından yeni
+    çıktı) + `sensor_profile`'ın kalibrasyon yöntemi (§6.1 B/C) ek referans
+    yaması istiyorsa o da basılır (`render_label_image`, geriye dönük
+    uyumlu: `sensor_profile=None` -> QR-içi/A-D). `save_png`'nin (düz QR)
+    aksine, decode testi için değil — GERÇEKTEN basılacak dosya budur."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img = render_label_image(qr, layout, sensor_profile, state=None, scale=scale, border=border)
+    img.save(path, dpi=(300, 300))
+    return path
+
+
+def save_label_pdf(
+    qr, layout: dict, sensor_profile: dict | None, path: str | Path, *, scale: int = 10, border: int = 4,
+) -> Path:
+    """`save_label_png` ile aynı görüntü, PDF olarak (rapor s.12: "300 dpi")."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img = render_label_image(qr, layout, sensor_profile, state=None, scale=scale, border=border)
+    img.convert("RGB").save(path, "PDF", resolution=300.0)
     return path
 
 

@@ -23,7 +23,7 @@ from packages.qr_layout import (
     seed_from_layout_version,
     select_reactive_modules,
 )
-from packages.qr_layout.render import save_pdf, save_png, save_synthetic_states, save_synthetic_states_for_profile
+from packages.qr_layout.render import save_label_pdf, save_label_png, save_synthetic_states, save_synthetic_states_for_profile
 
 
 def build_label_payload(
@@ -78,17 +78,21 @@ def export_label(
         "png": out / f"{stem}.png",
         "pdf": out / f"{stem}.pdf",
     }
-    save_png(qr, paths["png"], scale=10)
-    save_pdf(qr, paths["pdf"], scale=10)
-
     # DİKKAT: render, calibration yöntemi ek referans istiyorsa layout'u
-    # (reference_regions) YERİNDE günceller — bu yüzden layout_json'ı
-    # render'DAN SONRA yazıyoruz, yoksa dosyaya eski/eksik referans gider.
+    # (reference_regions) YERİNDE günceller — bu yüzden layout_json'ı VE
+    # basılabilir PNG/PDF'i render'DAN SONRA yazıyoruz, yoksa dosyaya eski/
+    # eksik referans gider ya da basılan görselde yama eksik kalır.
     if sensor_profile is not None:
         synthetic = save_synthetic_states_for_profile(qr, layout, out, stem=stem, sensor_profile=sensor_profile)
     else:
         synthetic = save_synthetic_states(qr, layout, out, stem=stem)
     paths.update({f"state_{state}": p for state, p in synthetic.items()})
+
+    # Basılabilir etiket (rapor s.12) — reaktif hücreleri nötr tonda VE
+    # (varsa) kalibrasyon referans yamalarını gösterir; düz/dekorsuz bir QR
+    # DEĞİL, gerçekte basılacak dosya budur (bkz. render.py modül başlığı).
+    save_label_png(qr, layout, sensor_profile, paths["png"], scale=10)
+    save_label_pdf(qr, layout, sensor_profile, paths["pdf"], scale=10)
 
     # Render sırasında reference_regions değişmiş olabilir (§6.1 B/C) — diske
     # yazmadan önce SON haliyle tekrar doğrula, geçersiz bir dosya sessizce

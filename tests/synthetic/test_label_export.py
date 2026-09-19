@@ -82,3 +82,48 @@ def test_export_label_without_sensor_profile_matches_old_behavior(tmp_path):
     payload = build_label_payload("TR-NOPROFILE", "LEVREK", "2026-09-18", "GENIPIN_PUTRESIN_v2", "QR_SENSOR_v4")
     result = export_label(payload, tmp_path, density="low")
     assert set(result["layout"]["reference_regions"]) == {"white", "black"}
+
+
+def test_printable_png_shows_reactive_design_not_plain_qr(tmp_path):
+    """Rapor s.12 "Basılabilir etiket PNG/PDF" — düz/dekorsuz bir QR DEĞİL,
+    reaktif hücreleri nötr tonda gösteren gerçek etiket görseli olmalı."""
+    from PIL import Image
+
+    from packages.qr_layout.colors import NEUTRAL, module_pixel_center
+
+    payload = build_label_payload("TR-PRINTABLE", "LEVREK", "2026-09-18", "GENIPIN_PUTRESIN_v2", "QR_SENSOR_v4")
+    result = export_label(payload, tmp_path, density="medium")
+
+    assert result["paths"]["pdf"].exists()
+    assert result["paths"]["pdf"].stat().st_size > 0
+
+    img = Image.open(result["paths"]["png"])
+    row, col = result["layout"]["sensor_modules"][0]
+    y, x = module_pixel_center(row, col, scale=10, border=4)
+    pixel = img.getpixel((x, y))
+
+    assert pixel not in ((0, 0, 0), (255, 255, 255))
+    assert pixel in (NEUTRAL["dark"], NEUTRAL["light"])
+
+    decoded = decode_qr_image(img)
+    assert decoded is not None
+    assert json.loads(decoded) == payload
+
+
+def test_printable_png_includes_edge_patches_for_multicolor_method(tmp_path):
+    """C (multicolor_patch) seçiliyse basılabilir PNG'nin boyutu da
+    ekstra kenar-yaması şeridini içermeli (düz QR'dan büyük olmalı)."""
+    from PIL import Image
+
+    payload_a = build_label_payload("TR-PRINT-A", "LEVREK", "2026-09-18", "GENIPIN_PUTRESIN_v2", "QR_SENSOR_v4")
+    payload_c = build_label_payload("TR-PRINT-C", "LEVREK", "2026-09-18", "GENIPIN_PUTRESIN_v2", "QR_SENSOR_v4")
+
+    result_a = export_label(payload_a, tmp_path / "a", density="medium", sensor_profile=None)
+    result_c = export_label(
+        payload_c, tmp_path / "c", density="medium",
+        sensor_profile={"calibration_method": {"code": "multicolor_patch"}},
+    )
+
+    size_a = Image.open(result_a["paths"]["png"]).size
+    size_c = Image.open(result_c["paths"]["png"]).size
+    assert size_c[0] > size_a[0]
