@@ -112,7 +112,22 @@ def test_quality_score_does_not_detect_uneven_lighting():
     KAYDI: ileride yerel/blok bazlı bir kalite bileşeni eklenirse bu test
     güncellenmeli. Gerçek risk: sistem düzensiz ışıkta "yeniden tara"
     ÖNERMEYEBİLİR; bu yüzden bu senaryoda sınıflandırmanın kendisinin
-    sağlam kalması (yukarıdaki test) ekstra önemli."""
+    sağlam kalması (yukarıdaki test) ekstra önemli.
+
+    2026-09-21: bunu genel (layout-farkında olmayan) bir piksel-ışık
+    sezgiselliğiyle düzeltmek denendi (kenar-ortası örnekleme + ağır
+    bulanıklaştırma, bkz. git geçmişi) — sentetik testlerde işe yaradı ama
+    GERÇEK cihaz fotoğraflarında (tests/device/manifest.csv) yanlış alarm
+    verdi: sağlıklı, net fotoğrafları da neredeyse 0 puana düşürdü, çünkü
+    ham karede QR çerçeveyi doldurmuyor (etrafında alakasız arka plan var).
+    Homografi SONRASI (yalnızca QR'ı dolduran `canonical` üzerinde) aynı
+    fikir denendiğinde bu sefer QR'ın kendi modül deseni (özellikle finder
+    pattern'lerin köşe asimetrisi) sinyali bastırdı, sonuçlar düzensiz ışık
+    şiddetiyle monotonik bile değildi. Sonuç: genel amaçlı bir düzeltme
+    güvenilir bulunamadı, geri alındı. Düzgün bir çözüm muhtemelen
+    layout-farkında olmalı (ör. birden fazla finder-pattern köşesindeki
+    BİLİNEN referans renklerini birbirleriyle karşılaştırmak) — bu, ayrı
+    ve daha büyük bir iş."""
     photo, layout = _render_angled_photo("TEST-UNEVEN-2", "fresh")
     profile = _build_profile("fresh", "spoiled")
 

@@ -80,6 +80,34 @@ def finder_pattern_reference_pixels(*, scale: int, border: int) -> dict[str, tup
     }
 
 
+# Bir QR'ın (versiyon fark etmez, ISO/IEC 18004) HER ZAMAN üç finder pattern'i
+# vardır: sol-üst, sağ-üst, sol-alt (sağ-alt YOK — bu asimetri QR'ın kendi
+# tasarımı). FINDER_BLACK_MODULE/FINDER_WHITE_MODULE sol-üst'e göre tanımlı;
+# diğer ikisi satır/sütunu `matrix_size - 1` etrafında AYNALAYARAK bulunur.
+# Kullanım alanı: `color_engine.pipeline` bu üç köşenin BEYAZ referansını
+# ayrı ayrı örnekleyip birbirleriyle karşılaştırır — aynı bilinen renk (saf
+# beyaz) üç farklı fiziksel konumdan okunduğunda aralarındaki fark yalnızca
+# IŞIKTAN kaynaklanabilir (bkz. pipeline.py::_reference_corner_consistency).
+# Bu, ham piksel sezgiselliğinden farklı: TAHMİN değil, üç ayrı yerdeki
+# BİLİNEN AYNI rengin ölçümü — 21 Eylül'de layout-farkında olmayan bir
+# piksel sezgiselliği (kenar-ortası örnekleme) hem sentetik hem gerçek
+# fotoğraflarla denendi, güvenilmez bulundu (bkz. tests/synthetic/
+# test_realistic_distortions.py::test_quality_score_does_not_detect_uneven_
+# lighting docstring'i); bu fonksiyon onun yerine geçen layout-farkında
+# yaklaşımın temelidir.
+def finder_pattern_corner_positions(matrix_size: int) -> dict[str, dict[str, tuple[int, int]]]:
+    """Üç finder pattern köşesinin her birinde siyah/beyaz modül (satır,
+    sütun) konumlarını döndürür: 'top_left', 'top_right', 'bottom_left'."""
+    black_row, black_col = FINDER_BLACK_MODULE
+    white_row, white_col = FINDER_WHITE_MODULE
+    last = matrix_size - 1
+    return {
+        "top_left": {"black": (black_row, black_col), "white": (white_row, white_col)},
+        "top_right": {"black": (black_row, last - black_col), "white": (white_row, last - white_col)},
+        "bottom_left": {"black": (last - black_row, black_col), "white": (last - white_row, white_col)},
+    }
+
+
 # --- Etiket kenarı referans yaması (rapor §5.2/5'in "QR içinde VEYA etiket
 # kenarında" alternatiflerinden ikincisi — bkz. render.py::render_with_
 # edge_gray_patch ve tests/synthetic/benchmark_edge_reference.py). ---

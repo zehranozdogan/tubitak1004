@@ -23,6 +23,16 @@ parlaklık kombinasyonu, DEMO_QR_STATE_COLORS_v1 ile): doğru sınıflandırıla
 sonuçlarda ortalama sapma 7.54 (n=51), YANLIŞ sınıflandırılanlarda 19.34
 (n=13) — net bir ayrım var, mükemmel değil (orta bantta örtüşme var, bu
 YANSITILIYOR: confidence orada da orta değer verir, uçlara zıplamaz).
+
+`confidence`'a ikinci bir çarpan (21 Eylül eklendi, bkz.
+`_reference_corner_consistency`): QR'ın üç finder köşesindeki BEYAZ
+referans ayrı ayrı örneklenip birbirleriyle karşılaştırılır — düzensiz
+ışıkta (flaş noktası, gölge) bu üçü ayrışır. Bilinçli olarak SERT BİR
+KAPI (rescan) DEĞİL, yalnızca confidence'ı düşüren yumuşak bir sinyal:
+aynı gün önce denenen layout-farkında OLMAYAN bir sezgisel (ham piksel
+kenar örneklemesi) hem sentetik hem GERÇEK cihaz fotoğraflarıyla test
+edildi, iyi/kullanılabilir gerçek fotoğrafları bile reddediyordu —
+geri alındı (bkz. tests/synthetic/test_realistic_distortions.py).
 """
 
 from __future__ import annotations
@@ -36,7 +46,12 @@ from packages.color_engine.matching import match_profile_point
 from packages.color_engine.quality import quality_score, should_rescan
 from packages.color_engine.roi import robust_module_color, sample_module_roi
 from packages.color_engine.types import ColorEngineResult, ModuleReading, Rgb
-from packages.qr_layout.colors import EDGE_REFERENCE_COLORS, FINDER_BLACK_MODULE, FINDER_WHITE_MODULE
+from packages.qr_layout.colors import (
+    EDGE_REFERENCE_COLORS,
+    FINDER_BLACK_MODULE,
+    FINDER_WHITE_MODULE,
+    finder_pattern_corner_positions,
+)
 from packages.qr_layout.decode import decode_qr_image_with_corners
 
 Image = np.ndarray
@@ -68,6 +83,50 @@ _REFERENCE_TRUE_COLORS_BGR = {
 # kombinasyonunda doğru sonuçlar ort. 7.5, yanlışlar ort. 19.3 sapma
 # veriyordu; 20 bu ikisinin arasında, yanlışların sınırına yakın bir eşik.
 _SPREAD_SATURATING_DELTA_E = 20.0
+
+# Referans köşe tutarlılığı için doygunluk noktası (bkz.
+# _reference_corner_consistency). ELLE ÖLÇÜLDÜ — uydurulmadı: 2 gerçek
+# cihaz fotoğrafında (tests/device/manifest.csv, ikisi de İYİ/kullanılabilir
+# okumalar) üç finder köşesinin beyaz parlaklığı arasındaki değişim katsayısı
+# 0.09 ve 0.15 çıktı; sentetik "aşırı düzensiz ışık" testinde (köşeden
+# köşeye ~7 kat kazanç) 0.145. Yani gerçek İYİ fotoğraflar bile sentetik
+# "aşırı" senaryoya yakın değer verebiliyor — bu yüzden eşik bilerek YÜKSEK
+# tutuldu (0.4): amaç sert bir kapı değil, YUMUŞAK bir confidence cezası
+# (21 Eylül'de denenen sert kapı/rescan yaklaşımı hem sentetik hem gerçek
+# fotoğraflarla test edildi, güvenilmez bulundu — bkz. tests/synthetic/
+# test_realistic_distortions.py). Yalnızca 2 gerçek örnekle daha sıkı bir
+# eşik koymak asılsız olurdu; gerçek cihaz testleriyle kalibre edilecek
+# (rapor §11 Aşama B).
+_CORNER_CV_SATURATING = 0.4
+
+
+def _reference_corner_consistency(canonical: Image, matrix_size: int) -> tuple[float, float]:
+    """0..1 tutarlılık çarpanı + ham değişim katsayısı (cv).
+
+    QR'ın üç finder pattern köşesindeki (sol-üst/sağ-üst/sol-alt) BEYAZ
+    referans modülü AYRI AYRI örneklenir — üçü de gerçekte AYNI (beyaz)
+    olması gerektiğinden aralarındaki fark yalnızca IŞIKTAN (flaş noktası,
+    gölge) kaynaklanabilir; tek noktalı kalibrasyon (A/D) bunu düzeltemez.
+    Kasıtlı olarak SADECE beyaz kullanılır, siyah değil — siyah modüllerin
+    mutlak parlaklığı çok düşük (~10-40/255) olduğundan aynı miktardaki
+    kamera gürültüsü orada orantısal olarak çok daha büyük (güvenilmez) bir
+    cv üretiyor (elle ölçüldü, gerçek fotoğraflarda siyah-cv 0.45-0.56 iken
+    beyaz-cv 0.09-0.15 çıktı)."""
+    positions = finder_pattern_corner_positions(matrix_size)
+    whites = []
+    for corner in positions.values():
+        row, col = corner["white"]
+        color = robust_module_color(
+            sample_module_roi(canonical, row, col, scale=_CANONICAL_SCALE, border=_CANONICAL_BORDER)
+        )
+        whites.append(float(np.mean(color)))
+    whites_arr = np.array(whites)
+    mean = float(whites_arr.mean())
+    if mean <= 1e-6:
+        return 1.0, 0.0
+    cv = float(whites_arr.std() / mean)
+    factor = max(0.0, min(1.0, 1.0 - cv / _CORNER_CV_SATURATING))
+    return factor, cv
 
 
 def _module_reading_confidence(module_readings: list[ModuleReading], representative_lab) -> float:
@@ -123,6 +182,11 @@ def analyze(
         image, qr_corners, matrix_size=matrix_size, scale=_CANONICAL_SCALE, border=_CANONICAL_BORDER
     )
 
+    # 2b. Işık düzensizliği için YUMUŞAK sinyal (bkz. _reference_corner_
+    #     consistency docstring) — kapı DEĞİL, aşağıda confidence'a çarpan
+    #     olarak uygulanır ve belirgin düştüğünde notes'a yazılır.
+    corner_factor, corner_cv = _reference_corner_consistency(canonical, matrix_size)
+
     # 3. Kalibrasyon — referans modül konumları layout_version.reference_regions'tan
     #    okunur (§10.1: "okuyucu koordinatları hard-code etmez, bu dosyadan okur").
     #    Eski/elle kurulmuş layout_version'larda bu alan yoksa (geriye dönük
@@ -138,6 +202,11 @@ def analyze(
     #    layout_version veya B/C için hiç yama basılmamış) white_black'e
     #    düşülür — sessizce değil, notes'a yazılarak.
     notes: list[str] = []
+    if corner_factor < 0.85:
+        notes.append(
+            f"Referans köşeleri arasında parlaklık farkı var (ışık düzensiz olabilir, "
+            f"değişim katsayısı {corner_cv:.2f}); confidence buna göre düşürüldü."
+        )
 
     def _sample_ref(pos: tuple[int, int]) -> tuple[float, float, float]:
         color = robust_module_color(
@@ -224,7 +293,7 @@ def analyze(
         matched_profile_point=match["matched_profile_point"],
         freshness_class=match["freshness_class"],
         technical_level=match["technical_level"],
-        confidence=_module_reading_confidence(module_readings, representative_lab),
+        confidence=_module_reading_confidence(module_readings, representative_lab) * corner_factor,
         module_readings=module_readings,
         notes=notes,
     )
