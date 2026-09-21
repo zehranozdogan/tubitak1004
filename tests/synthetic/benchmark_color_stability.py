@@ -49,7 +49,7 @@ PROFILE = json.loads(
      / "DEMO_QR_STATE_COLORS_v1.sensor_profile.json").read_text(encoding="utf-8")
 )
 
-DENSITIES = ["low", "medium", "high"]
+DENSITIES = ["low", "high"]
 
 # YALNIZCA decode'un GÜVENİLİR şekilde başardığı hafif/orta koşullar (rapor
 # §11 girişi: "QR ve renk ölçümünün güvenilirliği ayrı ayrı kanıtlanmalı" —

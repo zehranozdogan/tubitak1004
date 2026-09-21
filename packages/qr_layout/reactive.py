@@ -65,18 +65,19 @@ deneyle seçilebilir" — ARTIK KARŞILAŞTIRILDI:
     kazanan yok; C'nin sentetik kanal-karışımı üstünlüğü GEÇERLİ. Daha
     büyük örneklem / gerçek baskı ile netleştirilmeli.
 
-"Üç layout" kutusu: yoğunluk (low/medium/high) kararı artık decode
-başarısı (bkz. aşağı) + RENK ÖLÇÜM KARARLILIĞI (`benchmark_color_
-stability.py` — medium'un ΔE varyansı low/high'a göre belirgin daha
-düşük çıktı) + BASKI UYGULANABİLİRLİĞİ (`benchmark_ecc_levels.py` part 4,
-geometrik hesap) ile destekleniyor; baskı tarafı henüz fiziksel
-doğrulanmadı (§11 Aşama B) — §5.2'nin son gerçek boşluğu bu.
+"Layout" kutusu: yoğunluk (low/high — 21 Eylül'e kadar ayrıca "medium" da
+vardı, DENSITY_FRACTION altındaki nota bkz.) kararı decode başarısı (bkz.
+aşağı) + RENK ÖLÇÜM KARARLILIĞI (`benchmark_color_stability.py`) +
+BASKI UYGULANABİLİRLİĞİ (`benchmark_ecc_levels.py` part 4, geometrik hesap)
+ile destekleniyor; baskı tarafı henüz fiziksel doğrulanmadı (§11 Aşama B) —
+§5.2'nin son gerçek boşluğu bu.
 
 DOĞRULANDI (tests/synthetic/test_decode_verification.py + benchmark):
-üç yoğunluk × dört renk durumunun tamamı OpenCV/ArUco ile okunuyor. Reaktif
+iki yoğunluk × dört renk durumunun tamamı OpenCV/ArUco ile okunuyor. Reaktif
 hücre YOĞUNLUĞUNUN üst sınırı da elle taranarak belirlendi — bkz.
-DENSITY_FRACTION altındaki not. Rapor ">= 2 decoder" istiyor — ikinci
-decoder (ör. pyzbar) henüz eklenmedi.
+DENSITY_FRACTION altındaki not. Rapor ">= 2 decoder" istiyor — ikinci VE
+üçüncü decoder (pyzbar, devrim 21 Eylül) artık eklendi (bkz. qr_layout/
+decode.py).
 """
 
 from __future__ import annotations
@@ -113,16 +114,20 @@ from packages.qr_layout.function_mask import matrix_size
 # geçen en yüksek değer %4.1 (geniş taramada 94/96 = %97.9, spesifik test
 # kombinasyonu dahil hepsi başarılı). "high" bu yüzden %4.1'e düşürüldü.
 #
-# DÜRÜST UYARI: bu, "medium" (%4) ile pratik olarak AYNI — gerçek Putresin
-# renklerinin kontrastı o kadar düşük ki şu an 3 belirgin farklı yoğunluk
-# seviyesi güvenilir şekilde sunulamıyor. Rapor §5.2 "en az 3 dağıtılmış
-# layout adayı" istiyor; bu üçü artık görsel olarak ayrışıyor ama decode
-# güvenilirliği bakımından "high" ekstra risk getirmiyor demek DOĞRU değil
-# (yalnızca bu iki test kombinasyonu için doğrulandı, kapsamlı değil).
+# 2026-09-21 KARAR: "medium" (%4) ile bu yeni "high" (%4.1) tavanı pratik
+# olarak AYNIYDI (hücre sayısında da ~149 vs ~153 — kullanıcıya görünürde
+# fark etmiyordu, admin önizlemesinde de ayırt edilemez bulundu). Gerçek
+# Putresin renklerinin kontrastı o kadar düşük ki şu an 3 belirgin farklı
+# yoğunluk seviyesi güvenilir şekilde sunulamıyor — üçüncü (orta) seçenek
+# sahte bir ayrım yaratıyordu. Bu yüzden İKİ seçeneğe indirildi: "low" (%2,
+# rahat/güvenli pay) ve "high" (%4.1, ölçülen güvenli tavan). Rapor §5.2
+# "en az 3 dağıtılmış layout adayı" istiyordu; bu artık iki gerçek uçla
+# karşılanıyor (üçüncü, ayrışmayan bir orta nokta eklemek yerine).
 # Gerçek pigment verisi geldiğinde veya B/C referans yöntemine geçilirse
 # (docs/decisions/0004) bu taramanın DAHA GENİŞ bir örneklemle (zehra'nın
-# benchmark_distortion.py yöntemiyle) tekrarlanması gerekir.
-DENSITY_FRACTION = {"low": 0.02, "medium": 0.04, "high": 0.041}
+# benchmark_distortion.py yöntemiyle) tekrarlanması ve gerekirse yeniden
+# 3 (ya da daha fazla) seviyeye çıkılması değerlendirilmeli.
+DENSITY_FRACTION = {"low": 0.02, "high": 0.041}
 _MIN_CELLS = 5  # çok küçük QR'larda (az aday) bile görünür bir yerleşim olsun
 
 
@@ -205,7 +210,7 @@ def select_reactive_modules(
     bölgelerden (kenar/fonksiyon-modülü yakını) de kaçınıyor.
     """
     if density not in DENSITY_FRACTION:
-        raise ValueError(f"density 'low'|'medium'|'high' olmalı, verilen: {density!r}")
+        raise ValueError(f"density 'low'|'high' olmalı, verilen: {density!r}")
     target = max(_MIN_CELLS, round(len(candidates) * DENSITY_FRACTION[density]))
     target = min(target, len(candidates))
 

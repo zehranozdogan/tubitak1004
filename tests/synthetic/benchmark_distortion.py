@@ -40,7 +40,7 @@ PAYLOAD_TEXT = json.dumps(PAYLOAD, ensure_ascii=False, separators=(",", ":"))
 ANGLES = [0, 15, 30, 45]        # rapor §11.2
 BLURS = [0.0, 1.5, 3.0]         # yok / hafif / güçlü
 BRIGHTNESS_FACTORS = [0.5, 1.0, 1.6]   # karanlık / normal / parlama
-DENSITIES = ["low", "medium", "high"]
+DENSITIES = ["low", "high"]
 STATES = ["fresh", "transition", "spoiled"]
 
 

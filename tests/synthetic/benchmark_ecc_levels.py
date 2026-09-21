@@ -47,7 +47,7 @@ ECC_LEVELS = ["m", "q", "h"]  # rapor L'yi istemiyor (prototipte minimum ECC-M)
 ANGLES = [0, 15, 30, 45]
 BLURS = [0.0, 1.5, 3.0]
 BRIGHTNESS_FACTORS = [0.5, 1.0, 1.6]
-DENSITIES = ["low", "medium", "high"]
+DENSITIES = ["low", "high"]
 
 IERR_FRACTIONS = [0.05, 0.08, 0.10, 0.12, 0.15]
 IERR_TRIALS = 5
@@ -105,7 +105,7 @@ def part3_intentional_error_tolerance() -> None:
     for ecc in ECC_LEVELS:
         qr = generate_qr(PAYLOAD_TEXT, error=ecc)
         cands = reactive_candidates(qr)
-        sensor_modules = select_reactive_modules(cands, density="medium", seed=1)
+        sensor_modules = select_reactive_modules(cands, density="high", seed=1)
         sensor_set = set(sensor_modules)
         pool_size = len(cands) - len(sensor_set)
         for frac in IERR_FRACTIONS:
@@ -117,7 +117,7 @@ def part3_intentional_error_tolerance() -> None:
                 )
                 layout = build_layout(
                     qr, sensor_modules, layout_version=PAYLOAD["layout_version"],
-                    density="medium", intentional_errors=errors,
+                    density="high", intentional_errors=errors,
                 )
                 image = render_colored_image(qr, layout, state="spoiled", scale=10, border=4)
                 ok += _decode_ok(image)

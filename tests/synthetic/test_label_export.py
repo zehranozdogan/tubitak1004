@@ -92,7 +92,7 @@ def test_printable_png_shows_reactive_design_not_plain_qr(tmp_path):
     from packages.qr_layout.colors import NEUTRAL, module_pixel_center
 
     payload = build_label_payload("TR-PRINTABLE", "LEVREK", "2026-09-18", "GENIPIN_PUTRESIN_v2", "QR_SENSOR_v4")
-    result = export_label(payload, tmp_path, density="medium")
+    result = export_label(payload, tmp_path, density="high")
 
     assert result["paths"]["pdf"].exists()
     assert result["paths"]["pdf"].stat().st_size > 0
@@ -118,9 +118,9 @@ def test_printable_png_includes_edge_patches_for_multicolor_method(tmp_path):
     payload_a = build_label_payload("TR-PRINT-A", "LEVREK", "2026-09-18", "GENIPIN_PUTRESIN_v2", "QR_SENSOR_v4")
     payload_c = build_label_payload("TR-PRINT-C", "LEVREK", "2026-09-18", "GENIPIN_PUTRESIN_v2", "QR_SENSOR_v4")
 
-    result_a = export_label(payload_a, tmp_path / "a", density="medium", sensor_profile=None)
+    result_a = export_label(payload_a, tmp_path / "a", density="high", sensor_profile=None)
     result_c = export_label(
-        payload_c, tmp_path / "c", density="medium",
+        payload_c, tmp_path / "c", density="high",
         sensor_profile={"calibration_method": {"code": "multicolor_patch"}},
     )
 

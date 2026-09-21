@@ -33,7 +33,7 @@ PAYLOAD = {
 PAYLOAD_TEXT = json.dumps(PAYLOAD, ensure_ascii=False, separators=(",", ":"))
 
 
-@pytest.mark.parametrize("density", ["low", "medium", "high"])
+@pytest.mark.parametrize("density", ["low", "high"])
 @pytest.mark.parametrize("state", [None, "fresh", "transition", "spoiled"])
 def test_colored_qr_still_decodes(density, state):
     qr = generate_qr(PAYLOAD_TEXT, error="h")

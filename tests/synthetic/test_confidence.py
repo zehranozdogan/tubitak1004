@@ -68,8 +68,8 @@ def test_analyze_confidence_is_in_valid_range_end_to_end():
         ensure_ascii=False, separators=(",", ":"),
     )
     qr = generate_qr(payload, error="h")
-    modules = select_reactive_modules(reactive_candidates(qr), density="medium", seed=1)
-    layout = build_layout(qr, modules, layout_version="QR_SENSOR_v4", density="medium")
+    modules = select_reactive_modules(reactive_candidates(qr), density="high", seed=1)
+    layout = build_layout(qr, modules, layout_version="QR_SENSOR_v4", density="high")
 
     profile = {
         "scale_points": [{"value": 0.0, "lab": [50.0, 0.0, 0.0], "state": "fresh"}],
@@ -104,8 +104,8 @@ def test_analyze_confidence_high_for_clean_image():
         ensure_ascii=False, separators=(",", ":"),
     )
     qr = generate_qr(payload, error="h")
-    modules = select_reactive_modules(reactive_candidates(qr), density="medium", seed=1)
-    layout = build_layout(qr, modules, layout_version="QR_SENSOR_v4", density="medium")
+    modules = select_reactive_modules(reactive_candidates(qr), density="high", seed=1)
+    layout = build_layout(qr, modules, layout_version="QR_SENSOR_v4", density="high")
     profile = {
         "scale_points": [{"value": 0.0, "lab": [50.0, 0.0, 0.0], "state": "fresh"}],
         "class_thresholds": None,

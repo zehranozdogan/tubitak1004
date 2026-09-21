@@ -46,7 +46,7 @@ TRIALS_PER_POINT = 8
 def main() -> None:
     qr = generate_qr(PAYLOAD_TEXT, error="h")
     candidates = reactive_candidates(qr)
-    sensor_modules = select_reactive_modules(candidates, density="medium", seed=1)
+    sensor_modules = select_reactive_modules(candidates, density="high", seed=1)
     sensor_set = set(sensor_modules)
     pool_size = len(candidates) - len(sensor_set)
 
@@ -65,7 +65,7 @@ def main() -> None:
             )
             layout = build_layout(
                 qr, sensor_modules, layout_version=PAYLOAD["layout_version"],
-                density="medium", intentional_errors=errors,
+                density="high", intentional_errors=errors,
             )
             image = render_colored_image(qr, layout, state="spoiled", scale=10, border=4)
             decoded = decode_qr_image(image)

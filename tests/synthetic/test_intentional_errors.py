@@ -88,13 +88,13 @@ def test_small_number_of_intentional_errors_still_decodes():
     """Güvenli aralıkta (bkz. benchmark) az sayıda kasıtlı hata, ECC ile
     tolere edilip QR hâlâ doğru okunmalı — regresyon güvencesi."""
     qr, candidates = _qr_and_candidates()
-    sensor_modules = select_reactive_modules(candidates, density="medium", seed=1)
+    sensor_modules = select_reactive_modules(candidates, density="high", seed=1)
     errors = select_intentional_errors(
         candidates, count=15, exclude=set(sensor_modules), seed=1
     )
     layout = build_layout(
         qr, sensor_modules, layout_version=PAYLOAD["layout_version"],
-        density="medium", intentional_errors=errors,
+        density="high", intentional_errors=errors,
     )
     assert layout["intentional_errors"] == [[r, c] for r, c in errors]
 

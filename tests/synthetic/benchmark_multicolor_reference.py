@@ -108,8 +108,8 @@ def _measure(canonical_bgr, code, refs, sensor_rc, true_rgb) -> float:
 def main() -> None:
     qr = generate_qr(PAYLOAD_TEXT, error="h")
     matrix = module_matrix(qr)
-    modules = select_reactive_modules(reactive_candidates(qr), density="medium", seed=1)
-    layout = build_layout(qr, modules, layout_version=PAYLOAD["layout_version"], density="medium")
+    modules = select_reactive_modules(reactive_candidates(qr), density="high", seed=1)
+    layout = build_layout(qr, modules, layout_version=PAYLOAD["layout_version"], density="high")
     n = len(matrix)
 
     state = "fresh"

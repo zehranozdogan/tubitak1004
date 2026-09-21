@@ -17,8 +17,8 @@
     "ecc_level": { "type": "string", "enum": ["L", "M", "Q", "H"], "default": "H" },
     "module_density": {
       "type": "string",
-      "enum": ["low", "medium", "high"],
-      "description": "Rapor §8: en az 3 dagitilmis layout adayi"
+      "enum": ["low", "high"],
+      "description": "Rapor §8: dagitilmis layout adaylari (21 Eylul: 'medium' kaldirildi, 'high' ile ayirt edilemiyordu — bkz. qr_layout/reactive.py::DENSITY_FRACTION)"
     },
     "sensor_modules": {
       "type": "array",

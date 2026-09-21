@@ -159,7 +159,7 @@ def admin_body(page: ft.Page, nav) -> ft.Control:
         "layout_version", layout_ids[0], layout_ids, icon=ft.Icons.GRID_VIEW, editable=True
     )
     density = dropdown_field(
-        "Layout yoğunluğu", "low", ["low", "medium", "high"], icon=ft.Icons.TUNE
+        "Layout yoğunluğu", "low", ["low", "high"], icon=ft.Icons.TUNE
     )
 
     status = ft.Text("", size=T.T_CAPTION, color=T.C_MUTED)

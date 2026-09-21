@@ -118,8 +118,8 @@ def _measure(canonical_bgr, code: str, references: dict, *, sensor_row_col, true
 
 def main() -> None:
     qr = generate_qr(PAYLOAD_TEXT, error="h")
-    modules = select_reactive_modules(reactive_candidates(qr), density="medium", seed=1)
-    layout = build_layout(qr, modules, layout_version=PAYLOAD["layout_version"], density="medium")
+    modules = select_reactive_modules(reactive_candidates(qr), density="high", seed=1)
+    layout = build_layout(qr, modules, layout_version=PAYLOAD["layout_version"], density="high")
 
     state = "fresh"
     true_rgb = STATE_COLORS[state]["dark"]  # bilinen, sabit "gerçek" renk

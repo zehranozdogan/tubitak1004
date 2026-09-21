@@ -69,9 +69,8 @@ def test_higher_density_yields_more_reactive_cells():
     )
     candidates = reactive_candidates(qr)
     low = select_reactive_modules(candidates, density="low", seed=1)
-    medium = select_reactive_modules(candidates, density="medium", seed=1)
     high = select_reactive_modules(candidates, density="high", seed=1)
-    assert len(low) < len(medium) < len(high)
+    assert len(low) < len(high)
 
 
 def test_build_layout_matches_schema():
