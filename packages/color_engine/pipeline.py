@@ -24,15 +24,21 @@ sonuçlarda ortalama sapma 7.54 (n=51), YANLIŞ sınıflandırılanlarda 19.34
 (n=13) — net bir ayrım var, mükemmel değil (orta bantta örtüşme var, bu
 YANSITILIYOR: confidence orada da orta değer verir, uçlara zıplamaz).
 
-`confidence`'a ikinci bir çarpan (21 Eylül eklendi, bkz.
+Referans köşe tutarlılığı (21 Eylül eklendi, bkz.
 `_reference_corner_consistency`): QR'ın üç finder köşesindeki BEYAZ
 referans ayrı ayrı örneklenip birbirleriyle karşılaştırılır — düzensiz
-ışıkta (flaş noktası, gölge) bu üçü ayrışır. Bilinçli olarak SERT BİR
-KAPI (rescan) DEĞİL, yalnızca confidence'ı düşüren yumuşak bir sinyal:
-aynı gün önce denenen layout-farkında OLMAYAN bir sezgisel (ham piksel
-kenar örneklemesi) hem sentetik hem GERÇEK cihaz fotoğraflarıyla test
-edildi, iyi/kullanılabilir gerçek fotoğrafları bile reddediyordu —
-geri alındı (bkz. tests/synthetic/test_realistic_distortions.py).
+ışıkta (flaş noktası, gölge) bu üçü ayrışır. SADECE notes'a bilgi eklemek
+için kullanılır, confidence'ı SAYISAL olarak ETKİLEMEZ. İKİ AŞAMADA
+YUMUŞATILDI: önce (aynı gün) layout-farkında OLMAYAN bir sezgisel (ham
+piksel kenar örneklemesi) denendi, hem sentetik hem GERÇEK fotoğraflarla
+güvenilmez bulundu (bkz. tests/synthetic/test_realistic_distortions.py).
+Sonra layout-farkında bu yöntem geldi ve confidence'a bir ÇARPAN olarak
+eklendi — ama 2 gerçek fotoğraf + üzerlerine eklenen KÜÇÜK ek gölgelerle
+test edilince o çarpan da fazla sert çıktı (bilinen iyi bir fotoğrafta
+0.775 olan çarpan, yarım çerçeveye %50 hafif kararma eklenince 0.237'ye
+düşüyordu). N=2 gerçek veriyle sayısal bir çarpan haklı çıkarılamaz —
+şimdilik yalnızca bilgilendirici not (bkz. _reference_corner_consistency
+docstring'inin sonu, kullanıcı geri bildirimiyle 21 Eylül'de düzeltildi).
 """
 
 from __future__ import annotations
@@ -84,34 +90,42 @@ _REFERENCE_TRUE_COLORS_BGR = {
 # veriyordu; 20 bu ikisinin arasında, yanlışların sınırına yakın bir eşik.
 _SPREAD_SATURATING_DELTA_E = 20.0
 
-# Referans köşe tutarlılığı için doygunluk noktası (bkz.
-# _reference_corner_consistency). ELLE ÖLÇÜLDÜ — uydurulmadı: 2 gerçek
-# cihaz fotoğrafında (tests/device/manifest.csv, ikisi de İYİ/kullanılabilir
-# okumalar) üç finder köşesinin beyaz parlaklığı arasındaki değişim katsayısı
-# 0.09 ve 0.15 çıktı; sentetik "aşırı düzensiz ışık" testinde (köşeden
-# köşeye ~7 kat kazanç) 0.145. Yani gerçek İYİ fotoğraflar bile sentetik
-# "aşırı" senaryoya yakın değer verebiliyor — bu yüzden eşik bilerek YÜKSEK
-# tutuldu (0.4): amaç sert bir kapı değil, YUMUŞAK bir confidence cezası
-# (21 Eylül'de denenen sert kapı/rescan yaklaşımı hem sentetik hem gerçek
-# fotoğraflarla test edildi, güvenilmez bulundu — bkz. tests/synthetic/
-# test_realistic_distortions.py). Yalnızca 2 gerçek örnekle daha sıkı bir
-# eşik koymak asılsız olurdu; gerçek cihaz testleriyle kalibre edilecek
-# (rapor §11 Aşama B).
-_CORNER_CV_SATURATING = 0.4
+# Referans köşe tutarsızlığını NOT olarak işaretlemek için eşik (bkz.
+# _reference_corner_consistency). SADECE bilgilendirici — confidence'ı
+# SAYISAL olarak ÇARPMIYOR (21 Eylül'de önce denendi, geri alındı, bkz. bu
+# fonksiyonun docstring'inin sonu). ELLE ÖLÇÜLDÜ: 2 gerçek cihaz fotoğrafında
+# (tests/device/manifest.csv, ikisi de İYİ/kullanılabilir okumalar) cv 0.09
+# ve 0.15 çıktı; bu ikisinin üzerine SADECE hafif (%10-25) ek bir soldan-sağa
+# gölge eklendiğinde bile cv 0.11-0.16'ya çıkıyor — yani gerçek "iyi" ve
+# "hafif kötüleşmiş" arasındaki fark bu ölçekte küçük/gürültülü (3 nokta
+# üzerinden hesaplanan bir cv, doğası gereği gürültülü). Eşik bilerek bu
+# gözlemlenen aralığın BELİRGİN ÜSTÜNE (0.25) konuldu, gerçek cihaz
+# testleriyle kalibre edilecek (rapor §11 Aşama B).
+_CORNER_CV_NOTE_THRESHOLD = 0.25
 
 
-def _reference_corner_consistency(canonical: Image, matrix_size: int) -> tuple[float, float]:
-    """0..1 tutarlılık çarpanı + ham değişim katsayısı (cv).
+def _reference_corner_consistency(canonical: Image, matrix_size: int) -> float:
+    """QR'ın üç finder pattern köşesindeki (sol-üst/sağ-üst/sol-alt) BEYAZ
+    referans modülünü AYRI AYRI örnekleyip değişim katsayısını (cv) döner —
+    üçü de gerçekte AYNI (beyaz) olması gerektiğinden aralarındaki fark
+    yalnızca IŞIKTAN (flaş noktası, gölge) kaynaklanabilir; tek noktalı
+    kalibrasyon (A/D) bunu düzeltemez. Kasıtlı olarak SADECE beyaz
+    kullanılır, siyah değil — siyah modüllerin mutlak parlaklığı çok düşük
+    (~10-40/255) olduğundan aynı miktardaki kamera gürültüsü orada
+    orantısal olarak çok daha büyük (güvenilmez) bir cv üretiyor (elle
+    ölçüldü, gerçek fotoğraflarda siyah-cv 0.45-0.56 iken beyaz-cv 0.09-0.15
+    çıktı).
 
-    QR'ın üç finder pattern köşesindeki (sol-üst/sağ-üst/sol-alt) BEYAZ
-    referans modülü AYRI AYRI örneklenir — üçü de gerçekte AYNI (beyaz)
-    olması gerektiğinden aralarındaki fark yalnızca IŞIKTAN (flaş noktası,
-    gölge) kaynaklanabilir; tek noktalı kalibrasyon (A/D) bunu düzeltemez.
-    Kasıtlı olarak SADECE beyaz kullanılır, siyah değil — siyah modüllerin
-    mutlak parlaklığı çok düşük (~10-40/255) olduğundan aynı miktardaki
-    kamera gürültüsü orada orantısal olarak çok daha büyük (güvenilmez) bir
-    cv üretiyor (elle ölçüldü, gerçek fotoğraflarda siyah-cv 0.45-0.56 iken
-    beyaz-cv 0.09-0.15 çıktı)."""
+    NOT: bu değer confidence'ı SAYISAL olarak çarpmak için KULLANILMIYOR —
+    yalnızca notes'a (bkz. _CORNER_CV_NOTE_THRESHOLD) bilgi eklemek için.
+    İlk denemede (21 Eylül) `1 - cv/0.4` gibi bir çarpan confidence'a
+    uygulanmıştı; gerçek 2 fotoğraf + üzerlerine eklenen KÜÇÜK ek gölgelerle
+    test edilince bu çarpanın aşırı sert olduğu görüldü (bilinen İYİ bir
+    fotoğrafta 0.775 olan çarpan, çerçevenin sadece yarısına %50'lik hafif
+    bir kararma eklenince 0.237'ye düşüyordu — confidence'ı neredeyse
+    sıfırlıyordu). 3 örnekten hesaplanan bir cv'ye bu kadar güvenip sayısal
+    bir çarpan üretmek, N=2 gerçek veri noktasıyla haklı çıkarılamayacak
+    kadar iddialıydı; geri alındı."""
     positions = finder_pattern_corner_positions(matrix_size)
     whites = []
     for corner in positions.values():
@@ -123,10 +137,8 @@ def _reference_corner_consistency(canonical: Image, matrix_size: int) -> tuple[f
     whites_arr = np.array(whites)
     mean = float(whites_arr.mean())
     if mean <= 1e-6:
-        return 1.0, 0.0
-    cv = float(whites_arr.std() / mean)
-    factor = max(0.0, min(1.0, 1.0 - cv / _CORNER_CV_SATURATING))
-    return factor, cv
+        return 0.0
+    return float(whites_arr.std() / mean)
 
 
 def _module_reading_confidence(module_readings: list[ModuleReading], representative_lab) -> float:
@@ -182,10 +194,11 @@ def analyze(
         image, qr_corners, matrix_size=matrix_size, scale=_CANONICAL_SCALE, border=_CANONICAL_BORDER
     )
 
-    # 2b. Işık düzensizliği için YUMUŞAK sinyal (bkz. _reference_corner_
-    #     consistency docstring) — kapı DEĞİL, aşağıda confidence'a çarpan
-    #     olarak uygulanır ve belirgin düştüğünde notes'a yazılır.
-    corner_factor, corner_cv = _reference_corner_consistency(canonical, matrix_size)
+    # 2b. Işık düzensizliği için SADECE BİLGİLENDİRİCİ sinyal (bkz.
+    #     _reference_corner_consistency docstring) — kapı DEĞİL, confidence'ı
+    #     SAYISAL olarak da ETKİLEMEZ; yalnızca belirgin olduğunda notes'a
+    #     yazılır (bkz. _CORNER_CV_NOTE_THRESHOLD).
+    corner_cv = _reference_corner_consistency(canonical, matrix_size)
 
     # 3. Kalibrasyon — referans modül konumları layout_version.reference_regions'tan
     #    okunur (§10.1: "okuyucu koordinatları hard-code etmez, bu dosyadan okur").
@@ -202,10 +215,11 @@ def analyze(
     #    layout_version veya B/C için hiç yama basılmamış) white_black'e
     #    düşülür — sessizce değil, notes'a yazılarak.
     notes: list[str] = []
-    if corner_factor < 0.85:
+    if corner_cv > _CORNER_CV_NOTE_THRESHOLD:
         notes.append(
             f"Referans köşeleri arasında parlaklık farkı var (ışık düzensiz olabilir, "
-            f"değişim katsayısı {corner_cv:.2f}); confidence buna göre düşürüldü."
+            f"değişim katsayısı {corner_cv:.2f}); yalnızca bilgi amaçlı, confidence "
+            "SAYISAL olarak etkilenmedi."
         )
 
     def _sample_ref(pos: tuple[int, int]) -> tuple[float, float, float]:
@@ -293,7 +307,7 @@ def analyze(
         matched_profile_point=match["matched_profile_point"],
         freshness_class=match["freshness_class"],
         technical_level=match["technical_level"],
-        confidence=_module_reading_confidence(module_readings, representative_lab) * corner_factor,
+        confidence=_module_reading_confidence(module_readings, representative_lab),
         module_readings=module_readings,
         notes=notes,
     )
