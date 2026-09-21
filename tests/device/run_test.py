@@ -36,7 +36,7 @@ from packages.profile_schema.loader import (  # noqa: E402
     load_layout_version,
     load_sensor_profile,
 )
-from packages.qr_layout.decode import decode_qr_image_with_corners  # noqa: E402
+from packages.qr_layout.decode import _decode_with_pyzbar  # noqa: E402
 
 _OUT_DIR = _REPO_ROOT / "out"
 _LOG_FIELDS = [
@@ -49,8 +49,12 @@ _LOG_FIELDS = [
 
 
 def _decode_with_attempts(image) -> tuple[str | None, object, int]:
-    """decode_qr_image_with_corners'ı sarmalar; kaç dedektör denemesi
-    gerektiğini de döner (README log şemasındaki decode_attempts)."""
+    """decode_qr_image_with_corners'ın ÜÇ dedektörlü zincirini (bkz.
+    packages/qr_layout/decode.py modül notu, 21 Eylül pyzbar eklendi)
+    sarmalar; kaç dedektör denemesi gerektiğini de döner (README log
+    şemasındaki decode_attempts). `decode_qr_image_with_corners`'ı
+    doğrudan ÇAĞIRMAK yerine burada tekrar edilir çünkü o fonksiyon
+    deneme SAYISINI dışarı vermiyor — sadece son sonucu."""
     import cv2
 
     array = np.array(image.convert("RGB"))[:, :, ::-1] if hasattr(image, "convert") else image
@@ -58,7 +62,9 @@ def _decode_with_attempts(image) -> tuple[str | None, object, int]:
         text, points = detector.detectAndDecode(array)[:2]
         if text and points is not None and len(points) > 0:
             return (text, points.reshape(4, 2), attempt)
-    return (None, None, 2)
+
+    text, corners = _decode_with_pyzbar(array)
+    return (text, corners, 3)
 
 
 def _find_layout_version(product_id: str, layout_version_id: str) -> dict | None:

@@ -6,6 +6,9 @@ numpy>=1.26            # packages/color_engine (görüntü dizileri) + packages/
 opencv-python-headless>=4.9   # QR decode doğrulaması (qr_layout/decode.py, §11 Aşama A) +
                                # color_engine/quality.py (bulanıklık/parlama tespiti)
 scikit-image>=0.22    # color_engine/colorspace.py: RGB<->Lab + CIEDE2000 (doğrulanmış uygulama)
+pyzbar>=0.1.9          # 3. bağımsız QR decoder (qr_layout/decode.py, §11 Aşama A) — cv2'nin
+                        # iki dedektörünün de köşe bulup metni çözemediği gerçek bir fotoğrafta
+                        # kurtardı (21 Eylül)
 
 # apps/producer + apps/consumer (Flet prototipleri) — 0.86 ile test edildi.
 # 0.90'da API kırılımları var; üst sınır bilinçli.
@@ -15,7 +18,6 @@ flet-desktop>=0.86,<0.90     # `flet run -w` bunu da ister (web modunda bile)
 # geliştirme:
 pytest>=8
 
-# İLERİDE (color-engine gerçek uygulaması, packages/color_engine/pipeline.py):
-#   quality.py, calibration.py::white_black, colorspace.py TAMAMLANDI
-#   homografi / ROI örnekleme / sensor_profile eşleştirme hâlâ yok
-#   pyzbar veya başka bir 2. decoder -> §11 Aşama A çift-decoder karşılaştırması
+# color-engine gerçek uygulaması (packages/color_engine/pipeline.py) TAMAMLANDI
+# (quality.py, calibration.py, colorspace.py, homografi, ROI örnekleme,
+# sensor_profile eşleştirme). 3. decoder (pyzbar) de eklendi (21 Eylül).

@@ -90,6 +90,23 @@ _REFERENCE_TRUE_COLORS_BGR = {
 # veriyordu; 20 bu ikisinin arasında, yanlışların sınırına yakın bir eşik.
 _SPREAD_SATURATING_DELTA_E = 20.0
 
+# confidence formülünün TABAN noktası (21 Eylül eklendi — kullanıcı geri
+# bildirimi: "çok iyi şartlarda çekilmiş fotoğrafta bile confidence 0.64
+# ise..."). SEBEP: aynı durumun (ör. 'fresh') QR bitine göre iki farklı
+# tonu (koyu/açık, module_color §5.2/3) olduğundan, HİÇ BOZULMA OLMASA
+# BİLE sapma asla 0 olmuyor — bu YAPISAL bir taban gürültü. ELLE ÖLÇÜLDÜ
+# (bugün, açısız/renk kaymasız sentetik render'larla): fresh/spoiled ~3.2,
+# transition ~5.9. Eski formül (0 spread -> 1.0, sadece _SATURATING'e göre
+# ölçekli) bu tabanı hesaba katmıyordu — yani TEMİZ bir okuma bile pratikte
+# hiçbir zaman ~0.7-0.85'in üstüne çıkamıyordu (gerçek 2 cihaz fotoğrafında
+# görüldü: quality_score=1.0, hiç uyarı yok, yine de confidence 0.64/0.72).
+# Bu taban artık "yüksek güven" ucuna eşlenir (spread<=4 -> confidence 1.0),
+# _SPREAD_SATURATING_DELTA_E ise hâlâ "düşük güven" ucu. NOT: FLOOR bugün
+# doğrudan ölçüldü, SATURATING ise hâlâ eski (19 Eylül öncesi) 64-kombinasyon
+# taramasından — ikisi FARKLI tarihli kanıta dayanıyor, ileride SATURATING de
+# gerçek cihaz verisiyle yeniden doğrulanmalı (rapor §11 Aşama B).
+_SPREAD_FLOOR_DELTA_E = 4.0
+
 # Referans köşe tutarsızlığını NOT olarak işaretlemek için eşik (bkz.
 # _reference_corner_consistency). SADECE bilgilendirici — confidence'ı
 # SAYISAL olarak ÇARPMIYOR (21 Eylül'de önce denendi, geri alındı, bkz. bu
@@ -144,20 +161,28 @@ def _reference_corner_consistency(canonical: Image, matrix_size: int) -> float:
 def _module_reading_confidence(module_readings: list[ModuleReading], representative_lab) -> float:
     """0..1: reaktif modül okumaları BİRBİRİYLE ne kadar tutarlı (düşük
     sapma = yüksek güven). Her modülün temsilci (median) renkten ΔE
-    sapmasının ortalamasını alıp `_SPREAD_SATURATING_DELTA_E`'ye göre
-    normalize eder. Tek modüllü bir layout'ta anlamsızca hep 1.0 döner
-    (sapma tanımı gereği sıfır) — pratikte `_MIN_CELLS>=5` (qr_layout/
-    reactive.py) olduğu için bu durum beklenmez.
+    sapmasının ortalamasını alıp [`_SPREAD_FLOOR_DELTA_E`,
+    `_SPREAD_SATURATING_DELTA_E`] aralığına göre normalize eder — bu
+    aralığın ALTINDAKİ (temiz okumada zaten var olan yapısal taban
+    gürültüsü) hiçbir şeyi cezalandırmaz, ÜSTÜNDEKİ her şeyi 0'a satüre
+    eder. Tek modüllü bir layout'ta anlamsızca hep 1.0 döner (sapma tanımı
+    gereği sıfır) — pratikte `_MIN_CELLS>=5` (qr_layout/reactive.py)
+    olduğu için bu durum beklenmez.
 
     NOT: TEMİZ (bozulmasız) bir görüntüde bile sapma tam 0 OLMAZ — aynı
     durumun (ör. 'fresh') kendi içinde koyu/açık iki tonu var (module_color,
-    §5.2/3, QR bitine göre); bu YAPISAL bir taban gürültüdür, kalibrasyon
-    verisine zaten dahildir (ölçülen en temiz durumda bile sapma ~3.4-4.7)."""
+    §5.2/3, QR bitine göre); bu YAPISAL bir taban gürültüdür. Bkz.
+    `_SPREAD_FLOOR_DELTA_E` docstring'i: bu taban ARTIK confidence'ı
+    tavanlıyor (spread<=floor -> 1.0) — eskiden (20 Eylül'e kadar) doğrudan
+    _SATURATING'e göre ölçekleniyordu, yani TEMİZ bir okuma bile ~0.7-0.85'in
+    üstüne çıkamıyordu; kullanıcı bunu gerçek fotoğraflarla (0.64/0.72,
+    quality_score=1.0) sorguladı, 21 Eylül'de düzeltildi."""
     if not module_readings:
         return 0.0
     spreads = [delta_e(m.lab, representative_lab) for m in module_readings]
     mean_spread = float(np.mean(spreads))
-    return max(0.0, min(1.0, 1.0 - mean_spread / _SPREAD_SATURATING_DELTA_E))
+    span = _SPREAD_SATURATING_DELTA_E - _SPREAD_FLOOR_DELTA_E
+    return max(0.0, min(1.0, 1.0 - (mean_spread - _SPREAD_FLOOR_DELTA_E) / span))
 
 
 def _rescan_result(quality: float, note: str) -> ColorEngineResult:

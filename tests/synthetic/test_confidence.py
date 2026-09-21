@@ -89,12 +89,13 @@ def test_analyze_confidence_is_in_valid_range_end_to_end():
 
 
 def test_analyze_confidence_high_for_clean_image():
-    """Bozulma yok -> yüksek confidence. TAM 1.0 BEKLENMEZ: gerçek Putresin
-    tonlarında AYNI durum (ör. 'fresh') içinde bile modüller QR bitine göre
-    iki farklı ton (koyu/açık) gösterir (module_color, §5.2/3) — bu YAPISAL
-    bir sapmadır, ölçüm hatası değil; kalibrasyon verisi (pipeline.py
-    başlığı) zaten bunu içeriyordu (en temiz sentetik durumda bile sapma
-    ~3.4-4.7 idi, hiç 0 değildi)."""
+    """Bozulma yok -> yüksek confidence. 21 Eylül'e kadar TAM 1.0
+    beklenmiyordu (gerçek Putresin tonlarında AYNI durum içinde bile
+    modüller QR bitine göre iki farklı ton — koyu/açık — gösterir,
+    module_color §5.2/3, bu YAPISAL bir taban sapmasıdır). Artık bu taban
+    `_SPREAD_FLOOR_DELTA_E` ile confidence'ın ÖNÜNE geçmiyor (bkz.
+    pipeline.py başlığı, kullanıcı geri bildirimiyle 21 Eylül'de
+    düzeltildi) — temiz bir okuma artık gerçekten ~1.0'a yakın olmalı."""
     payload = json.dumps(
         {
             "product_id": "TR-CONF2", "product_type": "LEVREK", "production_date": "2026-09-18",
@@ -115,4 +116,15 @@ def test_analyze_confidence_high_for_clean_image():
     bgr = np.array(image.convert("RGB"))[:, :, ::-1]
 
     result = analyze(bgr, profile, layout)
-    assert result.confidence > 0.7
+    assert result.confidence > 0.95
+
+
+def test_confidence_reaches_near_one_below_structural_floor():
+    """_module_reading_confidence birim testi: yapısal taban sapmasının
+    (~3.4-4.7, module_color'un koyu/açık ikili tonundan) ALTINDAKİ bir
+    sapma artık ~1.0'a yakın olmalı — eski formülde (yalnızca
+    _SPREAD_SATURATING_DELTA_E'ye göre ölçekli) aynı sapma ~0.8 verirdi."""
+    center = Lab(L=50.0, a=10.0, b=10.0)
+    readings = [_reading(Lab(L=50.0 + d, a=10.0, b=10.0)) for d in (-2.0, 2.0)]  # ΔE ~2, tabanın altında
+
+    assert _module_reading_confidence(readings, center) == 1.0
