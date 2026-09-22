@@ -1,0 +1,18 @@
+name: color_engine
+description: >
+  packages/color_engine (Python) renk motorunun Dart portu. Flutter göçünün
+  ilk gerçek parçası — şu an sadece colorspace.py (RGB<->Lab, CIEDE2000)
+  taşındı, gerçek Python çıktılarıyla doğrulandı (bkz. test/).
+publish_to: "none"
+version: 0.0.1
+
+environment:
+  sdk: ^3.13.4
+
+# Add regular dependencies here.
+dependencies:
+  # path: ^1.9.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6
