@@ -163,12 +163,27 @@ def user_body(page: ft.Page, nav) -> ft.Control:
         }
 
         try:
-            layout_version = load_layout_version(OUT_DIR / f"{stem}.layout_version.json")
+            # DİKKAT (docs/decisions/0005-statik-veri-db-yok.md): burada
+            # KASITLI OLARAK `OUT_DIR`/`stem` KULLANMIYORUZ — o, üreticinin
+            # yerel çıktı klasörü, gerçek bir tüketicinin telefonunda hiç
+            # var olmayacak. Gerçek akışta elimizde SADECE QR'dan decode
+            # edilen payload var; layout_version ve sensor_profile_id de
+            # oradan (payload["layout_version"], payload["sensor_profile_id"])
+            # okunup uygulamayla birlikte PAKETLENMİŞ (bundled) referans
+            # dosyalarından (`PROFILE_EXAMPLES_DIR`) aranmalı — DB'ye gerek
+            # yok (rapor §13.1 kapsam dışı + §6.3 "kod içine gömülmemeli").
+            layout_version = load_layout_version(
+                PROFILE_EXAMPLES_DIR / f"{payload['layout_version']}.layout_version.json"
+            )
             profile_id = payload["sensor_profile_id"]
             sensor_profile = load_sensor_profile(
                 PROFILE_EXAMPLES_DIR / f"{profile_id}.sensor_profile.json"
             )
         except (OSError, KeyError, ValueError):
+            # Bilinmeyen layout_version/sensor_profile_id (ör. henüz
+            # paketlenmemiş bir sürüm) de GEÇERSİZ QR ile aynı ekrana düşer —
+            # kullanıcıya emin olmadığımız bir sonuç gösterilmez (§7.2 ile
+            # aynı "dürüst hata" ilkesi).
             show_invalid_qr()
             return
 
