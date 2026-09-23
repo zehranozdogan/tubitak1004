@@ -1,12 +1,11 @@
 # qr_layout (Dart portu)
 
-`packages/qr_layout` (Python) — reaktif hücre yerleşimi ve renk mantığının
-Dart'a taşınmış hâli. **Gerçek QR encoding (segno'nun yaptığı iş) BURADA
-YOK VE OLMAYACAK** — o iş, gerçek bir Dart QR kütüphanesine (pub.dev'de
-mevcut, ör. `qr`) bırakılacak; ML Kit'i decode için kullanmaya karar
-verdiğimiz mantığın aynısı (bkz. `apps/flutter_camera_spike`). Bu paket
-sadece ISO/IEC 18004'ün YAPISAL GEOMETRİSİni ve projeye özgü reaktif hücre
-seçim mantığını taşır — encoding'den TAMAMEN bağımsız, saf matematik.
+`packages/qr_layout` (Python) — reaktif hücre yerleşimi, renk mantığı VE
+(23 Eylül) gerçek QR encoding'in Dart'a taşınmış hâli. Segno'nun yerini
+`qr` paketi (pub.dev, kevmoo/qr.dart — saf Dart, ISO/IEC 18004 uyumlu,
+`qr_flutter`'ın da alt motoru) alıyor — bkz. `lib/src/generator.dart`.
+Decoder tarafında ML Kit kullanımının onaylanmasıyla (hoca görüşmesi)
+aynı oturumda, onu tamamlayan karar olarak seçildi.
 
 ## Ne var (Python dosyasına göre)
 
@@ -22,6 +21,17 @@ seçim mantığını taşır — encoding'den TAMAMEN bağımsız, saf matematik
   `selectReactiveModules`, `selectIntentionalErrors`, `buildLayout`,
   `seedFromLayoutVersion` (CRC-32, dış bağımlılık yok, gerçek
   `zlib.crc32` çıktısıyla birebir doğrulandı).
+- `generator.py` -> `lib/src/generator.dart` — `generateQr`, `moduleMatrix`,
+  `reactiveCandidatesForVersion` (Python: `reactive_candidates`). Segno
+  yerine `qr` paketi (bkz. yukarı). DOĞRULAMA: 'HELLO'+v1+H için gerçek
+  segno çıktısıyla TAM (bit bit) eşleşiyor (alfanümerik-sadece, tek
+  segment — segmentasyon belirsizliği yok). Karışık/uzun (JSON) bir
+  payload'da version/ecc seçimi segno ile AYNI (11, H) ama iç modül
+  matrisi FARKLI OLABİLİR (mod segmentasyonu/maske seçimi ISO 18004'in
+  izin verdiği ölçüde kütüphaneye özgü) — bu bir hata DEĞİL; gerçek
+  decode round-trip'i (pyzbar, projenin kendi decoder'larından biri) ile
+  ayrıca doğrulandı: Dart'ın ürettiği matris orijinal payload'a BİREBİR
+  geri decode ediliyor.
 
 ## Mimari sapma: RNG (ÖNEMLİ, mutlaka oku)
 
@@ -42,10 +52,12 @@ distance transform, safety score, crc32) ise gerçek Python ile BİREBİR.
 
 ## Sırada ne var
 
-- `generator.py`'nin geri kalanı port EDİLMEYECEK (segno'ya özgü) — bunun
-  yerine gerçek bir Dart QR paketi seçilip entegre edilecek.
 - `render.py` (SVG/PNG rasterize) — Flutter'da `CustomPainter` ile yeniden
-  yazılacak (zehra bunu araştırıyor), doğrudan port değil.
+  yazılacak (zehra bunu yapıyor), doğrudan port değil.
+- `label_export/export.py` orkestrasyonu (generate_qr -> reactive_candidates
+  -> select_reactive_modules -> build_layout -> validate -> render -> kaydet)
+  henüz Flutter tarafında BİRLEŞTİRİLMEDİ — parçalar (bu paket, profile_schema,
+  render) ayrı ayrı hazır, uçtan uca "etiket üret" akışı henüz yok.
 
 `packages_dart/color_engine` artık bu pakete BAĞIMLI (23 Eylül'de
 temizlendi — önceden `finder_pattern.dart` diye kısmi bir kopyası vardı,

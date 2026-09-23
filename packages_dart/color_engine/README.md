@@ -76,9 +76,10 @@ mobil) çalışır.
 
 ## Sırada ne var
 
-- `packages/qr_layout`'un geri kalanı (QR üretimi — segno yerine gerçek
-  bir Dart QR paketi seçilecek) — geometri/reaktif hücre kısmı zaten
-  `packages_dart/qr_layout`'ta port edildi ve bu paket artık ona bağımlı.
+- `packages/qr_layout`'un QR encoding kısmı da port edildi (23 Eylül,
+  `qr` paketiyle — bkz. `packages_dart/qr_layout/README.md`), ama bu
+  `color_engine`'i DOĞRUDAN ilgilendirmiyor (encoding, üretici/admin
+  tarafının işi; `color_engine` sadece OKUR/analiz eder).
 - `packages/profile_schema` portu edildi VE bu pakete bağlandı (23 Eylül)
   — `analyzeFrame` artık gerçek, doğrulanmış `schema.SensorProfile`/
   `schema.LayoutVersionData` alıyor, kendi minimal sınıfları YOK.
