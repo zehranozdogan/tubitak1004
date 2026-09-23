@@ -44,12 +44,12 @@ distance transform, safety score, crc32) ise gerçek Python ile BİREBİR.
 
 - `generator.py`'nin geri kalanı port EDİLMEYECEK (segno'ya özgü) — bunun
   yerine gerçek bir Dart QR paketi seçilip entegre edilecek.
-- `render.py` (SVG/PNG rasterize) — Flutter'da muhtemelen `CustomPainter`
-  ile yeniden yazılacak, doğrudan port değil.
-- `packages/color_engine`'in Dart portundaki (`packages_dart/color_engine`)
-  `finder_pattern.dart` bu paketle KISMEN örtüşüyor (aynı sabitler iki
-  yerde) — `color_engine`'in bu pakete bağımlı hale getirilip tekrarın
-  temizlenmesi gerekiyor.
+- `render.py` (SVG/PNG rasterize) — Flutter'da `CustomPainter` ile yeniden
+  yazılacak (zehra bunu araştırıyor), doğrudan port değil.
+
+`packages_dart/color_engine` artık bu pakete BAĞIMLI (23 Eylül'de
+temizlendi — önceden `finder_pattern.dart` diye kısmi bir kopyası vardı,
+kaldırıldı).
 
 ## Test etme
 

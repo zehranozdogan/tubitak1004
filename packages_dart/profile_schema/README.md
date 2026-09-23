@@ -30,14 +30,15 @@ platforma özgüdür (Flutter'da `rootBundle.loadString` ya da `dart:io
 File`, hedefe göre değişir) ve bu paketin sorumluluğu DEĞİL; çağıran
 (uygulama katmanı) dosyayı okuyup metni buraya verir.
 
-## Bilinen entegrasyon notu
+## Entegrasyon durumu (23 Eylül)
 
+`packages_dart/color_engine` artık bu pakete BAĞIMLI — `analyzeFrame`
+gerçek `SensorProfile`/`LayoutVersionData`'yı doğrudan alıyor.
 `LayoutVersionData.sensorModules`'un hücre tipi (`(int row, int col)`,
-konumsal kayıt) `packages_dart/color_engine`'in `LayoutVersion.
-sensorModules`'unda kullanılan tiple (`({int row, int col})`, isimli
-kayıt) AYNI DEĞİL — ikisi ayrı ayrı kurulmuş paketler. `color_engine`'i
-bu paketle gerçekten birleştirirken küçük bir dönüşüm (ya da tip
-birleştirmesi) gerekecek.
+konumsal kayıt) `color_engine`'in geri kalanında kullanılan isimli kayıt
+(`({int row, int col})`) ile AYNI DEĞİL — bu paketin kendi API'sini
+değiştirmedik (zaten test edilmişti), dönüşüm `color_engine/pipeline.dart::
+_toNamedCell`'de TEK bir yerde yapılıyor.
 
 ## Test etme
 

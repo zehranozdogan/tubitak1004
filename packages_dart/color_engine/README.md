@@ -30,9 +30,12 @@ port edildi, 73/73 test geçiyor, `dart analyze` 0 uyarı).
   confidence formülü, köşe tutarlılık notu) BİREBİR port edildi.
 - `linalg.dart` — küçük, dış bağımlılıksız lineer cebir (Gauss-Jordan),
   `calibration.dart` ve `homography.dart` arasında paylaşılıyor.
-- `finder_pattern.dart` — `packages/qr_layout/colors.py`'den SADECE
-  `pipeline.dart`'ın ihtiyaç duyduğu küçük alt küme (finder modül
-  sabitleri, kenar referans renkleri). qr_layout'un TAMAMI port edilmedi.
+
+Bu paket artık **`packages_dart/qr_layout`'a bağımlı** (`pubspec.yaml`,
+path dependency) — finder pattern sabitleri (`finderBlackModule`,
+`finderWhiteModule`, `finderPatternCornerPositions`, `edgeReferenceColors`)
+oradan alınır, ARTIK İKİ YERDE TEKRARLANMIYOR (23 Eylül'de temizlendi;
+öncesinde `finder_pattern.dart` diye kısmi bir kopya vardı).
 
 ## Mimari sapmalar (Python'dan KASITLI, her biri kodda ayrıca belgeli)
 
@@ -44,9 +47,11 @@ port edildi, 73/73 test geçiyor, `dart analyze` 0 uyarı).
    ZORUNLU parametredir (Python'daki gibi içeride cv2/pyzbar ile
    decode ETMEZ) — Flutter'da QR tespiti muhtemelen ML Kit ile ayrı bir
    katmanda yapılacak (bkz. `apps/flutter_camera_spike`).
-3. `profile_schema` (JSON şema doğrulama) port edilmedi — `SensorProfile`/
-   `LayoutVersion` şimdilik sadece pipeline'ın okuduğu alanları taşıyan
-   minimal Dart sınıfları.
+3. `SensorProfile`/`LayoutVersionData` artık `package:profile_schema`'dan
+   (23 Eylül'de bağlandı — önceden bu pakette SADECE pipeline'ın
+   ihtiyaç duyduğu alanları taşıyan minimal, kendi sınıfları vardı).
+   Hücre tipi profile_schema'da konumsal kayıt, bu paketin geri kalanında
+   isimli kayıt — dönüşüm `pipeline.dart::_toNamedCell`'de TEK yerde.
 
 ## Test yöntemi
 
@@ -71,9 +76,12 @@ mobil) çalışır.
 
 ## Sırada ne var
 
-- `packages/qr_layout`'un TAMAMININ portu (QR üretimi, reaktif hücre
-  yerleşimi) — şu an sadece `finder_pattern.dart`'taki küçük alt küme var.
-- `packages/profile_schema` portu (JSON okuma/doğrulama).
+- `packages/qr_layout`'un geri kalanı (QR üretimi — segno yerine gerçek
+  bir Dart QR paketi seçilecek) — geometri/reaktif hücre kısmı zaten
+  `packages_dart/qr_layout`'ta port edildi ve bu paket artık ona bağımlı.
+- `packages/profile_schema` portu edildi VE bu pakete bağlandı (23 Eylül)
+  — `analyzeFrame` artık gerçek, doğrulanmış `schema.SensorProfile`/
+  `schema.LayoutVersionData` alıyor, kendi minimal sınıfları YOK.
 - Gerçek kamera/ML Kit entegrasyonu ile bu paketin birleştirilmesi
   (`apps/flutter_camera_spike`'ın `color_pipeline_stub.dart`'ı bu paketle
   değiştirilecek).

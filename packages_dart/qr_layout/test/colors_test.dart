@@ -7,18 +7,18 @@ import 'package:test/test.dart';
 void main() {
   group('moduleColor', () {
     test('sensör olmayan modül -> bit rengine göre saf siyah/beyaz', () {
-      expect(moduleColor(1, false, null), (0, 0, 0));
-      expect(moduleColor(0, false, null), (255, 255, 255));
+      expect(moduleColor(1, false, null), (r: 0, g: 0, b: 0));
+      expect(moduleColor(0, false, null), (r: 255, g: 255, b: 255));
     });
 
     test('sensör modülü, state verilmiş -> STATE_COLORS tonu', () {
-      expect(moduleColor(1, true, 'fresh'), (193, 176, 160));
-      expect(moduleColor(0, true, 'fresh'), (214, 205, 196));
-      expect(moduleColor(0, true, 'spoiled'), (78, 66, 66));
+      expect(moduleColor(1, true, 'fresh'), (r: 193, g: 176, b: 160));
+      expect(moduleColor(0, true, 'fresh'), (r: 214, g: 205, b: 196));
+      expect(moduleColor(0, true, 'spoiled'), (r: 78, g: 66, b: 66));
     });
 
     test('sensör modülü, state null -> nötr gri', () {
-      expect(moduleColor(1, true, null), (97, 97, 97));
+      expect(moduleColor(1, true, null), (r: 97, g: 97, b: 97));
     });
   });
 
@@ -45,7 +45,7 @@ void main() {
   test('sabitler gerçek Python değerleriyle eşleşir', () {
     expect(edgePatchMargin, 4);
     expect(edgePatchSize, 3);
-    expect(grayReferenceRgb, (128, 128, 128));
+    expect(grayReferenceRgb, (r: 128, g: 128, b: 128));
   });
 
   test('finderPatternCornerPositions gerçek Python çıktısıyla eşleşir (matrixSize=25)', () {

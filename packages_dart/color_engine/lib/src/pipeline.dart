@@ -20,17 +20,32 @@
 //    dinamik bir fonksiyon sözlüğünden yapılıyordu; burada tip-güvenli
 //    açık dallanma (if/else) kullanıldı — davranış BİREBİR aynı, sadece
 //    Dart'ta daha doğal bir desen.
+//
+// 4. `SensorProfile`/`LayoutVersionData` artık `package:profile_schema`'dan
+//    (23 Eylül'de eklendi) — önceden bu dosyada SADECE pipeline'ın
+//    ihtiyaç duyduğu alanları taşıyan minimal, kendi sınıfları vardı;
+//    şimdi gerçek, doğrulanmış (JSON şema kurallarını uygulayan) tipler
+//    doğrudan kullanılıyor. `layoutVersion.sensorModules`/`referenceRegions`
+//    hücre tipi profile_schema'da KONUMSAL kayıt (`(int row, int col)`,
+//    `.row`/`.col` YOK, sadece söküm/`.$1`/`.$2`) — bu dosyanın geri
+//    kalanı ise İSİMLİ kayıt (`({int row, int col})`) kullanıyor
+//    (qr_layout ile tutarlı olsun diye); aradaki dönüşüm
+//    `_toNamedCell`'de tek bir yerde yapılıyor.
 
 import 'dart:math' as math;
 
+import 'package:profile_schema/profile_schema.dart' as schema;
+import 'package:qr_layout/qr_layout.dart' show edgeReferenceColors, finderBlackModule, finderPatternCornerPositions, finderWhiteModule;
+
 import 'calibration.dart';
 import 'colorspace.dart';
-import 'finder_pattern.dart';
 import 'homography.dart';
 import 'matching.dart';
 import 'quality.dart';
 import 'roi.dart';
 import 'types.dart';
+
+({int row, int col}) _toNamedCell((int, int) cell) => (row: cell.$1, col: cell.$2);
 
 const int _canonicalScale = 10;
 const int _canonicalBorder = 4;
@@ -53,42 +68,12 @@ const double _spreadFloorDeltaE = 4.0;
 // gerçek fotoğraflarla aşırı sert bulunup geri alınmıştı).
 const double _cornerCvNoteThreshold = 0.25;
 
-/// sensor_profile.scale_points'teki tek bir referans noktası konumu —
-/// layout_version.reference_regions'ta bir isme (white/black/gray/red/
-/// green/blue) karşılık gelen (satır, sütun). Python `ref_regions[name][0]`
-/// yapıyordu (listenin ilk elemanı) — burada doğrudan tek konum.
-class LayoutVersion {
-  final int matrixSize;
-  final List<({int row, int col})> sensorModules;
-  final Map<String, ({int row, int col})> referenceRegions;
-
-  const LayoutVersion({
-    required this.matrixSize,
-    required this.sensorModules,
-    this.referenceRegions = const {},
-  });
-}
-
-class SensorProfile {
-  final List<ScalePoint> scalePoints;
-  final bool hasClassThresholds;
-  final String calibrationMethodCode;
-  final double minQualityScore;
-
-  const SensorProfile({
-    required this.scalePoints,
-    required this.hasClassThresholds,
-    this.calibrationMethodCode = 'white_black',
-    this.minQualityScore = 0.5,
-  });
-}
-
 // BGR dönüşümü GEREKMEZ (bkz. dosya başlığı sapma #2) — Python'daki
 // _REFERENCE_TRUE_COLORS_BGR'nin tersine, burada doğrudan gerçek RGB.
 Map<String, Rgb> _referenceTrueColorsRgb() {
   final map = <String, Rgb>{'white': const Rgb(255, 255, 255), 'black': const Rgb(0, 0, 0)};
   for (final entry in edgeReferenceColors.entries) {
-    map[entry.key] = Rgb(entry.value.r, entry.value.g, entry.value.b);
+    map[entry.key] = Rgb(entry.value.r.toDouble(), entry.value.g.toDouble(), entry.value.b.toDouble());
   }
   return map;
 }
@@ -137,17 +122,30 @@ ColorEngineResult _rescanResult(double quality, String note) {
 /// bulunmuş olarak verilir).
 ColorEngineResult analyzeFrame(
   RgbImage image, {
-  required SensorProfile sensorProfile,
-  required LayoutVersion layoutVersion,
+  required schema.SensorProfile sensorProfile,
+  required schema.LayoutVersionData layoutVersion,
   required List<List<double>> qrCorners,
 }) {
+  // profile_schema'nın (tam, doğrulanmış) tiplerinden bu fonksiyonun
+  // ihtiyaç duyduğu değerleri türet (bkz. dosya başlığı sapma #4).
+  final minQualityScore = sensorProfile.qualityGate.minQualityScore;
+  final hasClassThresholds = sensorProfile.classThresholds != null;
+  final scalePoints = sensorProfile.scalePoints
+      .map((e) => ScalePoint(value: e.value, lab: Lab(e.lab[0], e.lab[1], e.lab[2]), state: e.state))
+      .toList();
+  final sensorModulesCells = layoutVersion.sensorModules.map(_toNamedCell).toList();
+  final referenceRegionsCells = {
+    for (final entry in layoutVersion.referenceRegions.entries)
+      if (entry.value.isNotEmpty) entry.key: _toNamedCell(entry.value.first),
+  };
+
   // 8 (önce kontrol edilir — kötü görüntüde diğer adımlara hiç girilmez, §7.1).
   final quality = qualityScore(image);
-  if (shouldRescan(quality, sensorProfile.minQualityScore)) {
+  if (shouldRescan(quality, minQualityScore)) {
     return _rescanResult(quality, 'Görüntü kalitesi yetersiz (bulanık/parlamalı/karanlık).');
   }
 
-  if (layoutVersion.sensorModules.isEmpty) {
+  if (sensorModulesCells.isEmpty) {
     return _rescanResult(quality, 'layout_version.sensor_modules boş; ölçülecek reaktif hücre yok.');
   }
 
@@ -177,13 +175,13 @@ ColorEngineResult analyzeFrame(
     return robustModuleColor(patch);
   }
 
-  final refRegions = layoutVersion.referenceRegions;
+  final refRegions = referenceRegionsCells;
   final whitePos = refRegions['white'] ?? finderWhiteModule;
   final blackPos = refRegions['black'] ?? finderBlackModule;
   final whiteRef = sampleRef(whitePos);
   final blackRef = sampleRef(blackPos);
 
-  var code = sensorProfile.calibrationMethodCode;
+  var code = sensorProfile.calibrationMethod.code;
   final trueColors = _referenceTrueColorsRgb();
 
   Rgb? grayRef;
@@ -237,7 +235,7 @@ ColorEngineResult analyzeFrame(
   // 4-5. Reaktif hücrelerin ROI örneklemesi (parlama/gölge elenmiş median).
   final moduleReadings = <ModuleReading>[];
   final rgbSamples = <Rgb>[];
-  for (final (:row, :col) in layoutVersion.sensorModules) {
+  for (final (:row, :col) in sensorModulesCells) {
     final patch = sampleModuleRoi(corrected, row, col, scale: _canonicalScale, border: _canonicalBorder);
     final rgb = robustModuleColor(patch);
     rgbSamples.add(rgb);
@@ -264,8 +262,8 @@ ColorEngineResult analyzeFrame(
   // 7. sensor_profile.scale_points ile eşleştirme (§7.2 sınıf kuralı dahil).
   final match = matchProfilePoint(
     representativeLab,
-    scalePoints: sensorProfile.scalePoints,
-    hasClassThresholds: sensorProfile.hasClassThresholds,
+    scalePoints: scalePoints,
+    hasClassThresholds: hasClassThresholds,
   );
 
   return ColorEngineResult(

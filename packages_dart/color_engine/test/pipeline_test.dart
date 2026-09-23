@@ -8,8 +8,13 @@
 // (kimlik/identity dönüşüm) — böylece test görüntüsü doğrudan "zaten
 // canonical" gibi kurulabilir, warpToCanonical (ayrıca doğrulanmış) yine
 // GERÇEKTEN çalıştırılır ama sonucu öngörülebilir kalır.
+//
+// 23 Eylül: sensorProfile/layoutVersion artık package:profile_schema'nın
+// GERÇEK, doğrulanmış tipleri (bkz. pipeline.dart dosya başlığı sapma #4).
 
 import 'package:color_engine/color_engine.dart';
+import 'package:profile_schema/profile_schema.dart' as schema;
+import 'package:qr_layout/qr_layout.dart' show finderBlackModule, finderPatternCornerPositions, finderWhiteModule;
 import 'package:test/test.dart';
 
 const _scale = 10;
@@ -44,6 +49,38 @@ List<List<double>> _identityCorners() {
   return canonicalQrCorners(_matrixSize, scale: _scale, border: _border);
 }
 
+/// Test yardımcıları: gerçek `profile_schema.SensorProfile`/
+/// `LayoutVersionData` inşa eder — bu testlerin odağı olmayan zorunlu
+/// alanlara (profileId, analyteAxis, outputFields, qrVersion, layoutVersion
+/// metni) makul sabit değerler verilir.
+schema.SensorProfile _profile({
+  required List<schema.ScalePointEntry> scalePoints,
+  required bool hasClassThresholds,
+  String calibrationCode = 'white_black',
+}) {
+  return schema.SensorProfile(
+    profileId: 'TEST_PROFILE',
+    analyteAxis: 'test_axis',
+    scalePoints: scalePoints,
+    calibrationMethod: schema.CalibrationMethod(code: calibrationCode),
+    classThresholds: hasClassThresholds ? const schema.ClassThresholds() : null,
+    outputFields: const [],
+  );
+}
+
+schema.LayoutVersionData _layout({
+  required List<({int row, int col})> sensorModules,
+  Map<String, List<(int, int)>> referenceRegions = const {},
+}) {
+  return schema.LayoutVersionData(
+    layoutVersion: 'TEST_LAYOUT',
+    qrVersion: 1,
+    matrixSize: _matrixSize,
+    sensorModules: [for (final m in sensorModules) (m.row, m.col)],
+    referenceRegions: referenceRegions,
+  );
+}
+
 void main() {
   final sensorModules = [
     (row: 10, col: 10),
@@ -59,8 +96,8 @@ void main() {
   final spoiledLab = rgbToLab(spoiledRgb);
 
   final scalePoints = [
-    ScalePoint(value: 0.0, lab: freshLab, state: 'fresh'),
-    ScalePoint(value: 1.0, lab: spoiledLab, state: 'spoiled'),
+    schema.ScalePointEntry(value: 0.0, lab: [freshLab.L, freshLab.a, freshLab.b], state: 'fresh'),
+    schema.ScalePointEntry(value: 1.0, lab: [spoiledLab.L, spoiledLab.a, spoiledLab.b], state: 'spoiled'),
   ];
 
   Map<({int row, int col}), Rgb> baseModules(Rgb sensorColor) {
@@ -80,8 +117,8 @@ void main() {
     final image = RgbImage.filled(size, size, const Rgb(5, 5, 5));
     final result = analyzeFrame(
       image,
-      sensorProfile: SensorProfile(scalePoints: scalePoints, hasClassThresholds: true),
-      layoutVersion: LayoutVersion(matrixSize: _matrixSize, sensorModules: sensorModules),
+      sensorProfile: _profile(scalePoints: scalePoints, hasClassThresholds: true),
+      layoutVersion: _layout(sensorModules: sensorModules),
       qrCorners: _identityCorners(),
     );
     expect(result.rescanRecommended, isTrue);
@@ -92,8 +129,8 @@ void main() {
     final image = _buildCanonicalLikePhoto(background: const Rgb(128, 128, 128), modules: baseModules(freshRgb));
     final result = analyzeFrame(
       image,
-      sensorProfile: SensorProfile(scalePoints: scalePoints, hasClassThresholds: true),
-      layoutVersion: LayoutVersion(matrixSize: _matrixSize, sensorModules: const []),
+      sensorProfile: _profile(scalePoints: scalePoints, hasClassThresholds: true),
+      layoutVersion: _layout(sensorModules: const []),
       qrCorners: _identityCorners(),
     );
     expect(result.rescanRecommended, isTrue);
@@ -104,8 +141,8 @@ void main() {
     final image = _buildCanonicalLikePhoto(background: const Rgb(128, 128, 128), modules: baseModules(freshRgb));
     final result = analyzeFrame(
       image,
-      sensorProfile: SensorProfile(scalePoints: scalePoints, hasClassThresholds: true),
-      layoutVersion: LayoutVersion(matrixSize: _matrixSize, sensorModules: sensorModules),
+      sensorProfile: _profile(scalePoints: scalePoints, hasClassThresholds: true),
+      layoutVersion: _layout(sensorModules: sensorModules),
       qrCorners: _identityCorners(),
     );
     expect(result.rescanRecommended, isFalse);
@@ -120,8 +157,8 @@ void main() {
     final image = _buildCanonicalLikePhoto(background: const Rgb(128, 128, 128), modules: baseModules(freshRgb));
     final result = analyzeFrame(
       image,
-      sensorProfile: SensorProfile(scalePoints: scalePoints, hasClassThresholds: false),
-      layoutVersion: LayoutVersion(matrixSize: _matrixSize, sensorModules: sensorModules),
+      sensorProfile: _profile(scalePoints: scalePoints, hasClassThresholds: false),
+      layoutVersion: _layout(sensorModules: sensorModules),
       qrCorners: _identityCorners(),
     );
     expect(result.rescanRecommended, isFalse);
@@ -133,8 +170,8 @@ void main() {
     final image = _buildCanonicalLikePhoto(background: const Rgb(128, 128, 128), modules: baseModules(spoiledRgb));
     final result = analyzeFrame(
       image,
-      sensorProfile: SensorProfile(scalePoints: scalePoints, hasClassThresholds: true),
-      layoutVersion: LayoutVersion(matrixSize: _matrixSize, sensorModules: sensorModules),
+      sensorProfile: _profile(scalePoints: scalePoints, hasClassThresholds: true),
+      layoutVersion: _layout(sensorModules: sensorModules),
       qrCorners: _identityCorners(),
     );
     expect(result.freshnessClass, 'spoiled');
@@ -144,12 +181,12 @@ void main() {
     final image = _buildCanonicalLikePhoto(background: const Rgb(128, 128, 128), modules: baseModules(freshRgb));
     final result = analyzeFrame(
       image,
-      sensorProfile: SensorProfile(
+      sensorProfile: _profile(
         scalePoints: scalePoints,
         hasClassThresholds: true,
-        calibrationMethodCode: 'white_gray_black',
+        calibrationCode: 'white_gray_black',
       ),
-      layoutVersion: LayoutVersion(matrixSize: _matrixSize, sensorModules: sensorModules),
+      layoutVersion: _layout(sensorModules: sensorModules),
       qrCorners: _identityCorners(),
     );
     expect(result.rescanRecommended, isFalse);
@@ -162,12 +199,12 @@ void main() {
     final image = _buildCanonicalLikePhoto(background: const Rgb(128, 128, 128), modules: baseModules(freshRgb));
     final result = analyzeFrame(
       image,
-      sensorProfile: SensorProfile(
+      sensorProfile: _profile(
         scalePoints: scalePoints,
         hasClassThresholds: true,
-        calibrationMethodCode: 'learned',
+        calibrationCode: 'learned',
       ),
-      layoutVersion: LayoutVersion(matrixSize: _matrixSize, sensorModules: sensorModules),
+      layoutVersion: _layout(sensorModules: sensorModules),
       qrCorners: _identityCorners(),
     );
     expect(result.notes.first, contains("desteklenmiyor"));
@@ -183,8 +220,8 @@ void main() {
     final image = _buildCanonicalLikePhoto(background: const Rgb(128, 128, 128), modules: modifiedModules);
     final result = analyzeFrame(
       image,
-      sensorProfile: SensorProfile(scalePoints: scalePoints, hasClassThresholds: true),
-      layoutVersion: LayoutVersion(matrixSize: _matrixSize, sensorModules: sensorModules),
+      sensorProfile: _profile(scalePoints: scalePoints, hasClassThresholds: true),
+      layoutVersion: _layout(sensorModules: sensorModules),
       qrCorners: _identityCorners(),
     );
     expect(result.notes.any((n) => n.contains('Referans köşeleri')), isTrue);

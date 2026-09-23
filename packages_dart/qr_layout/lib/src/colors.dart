@@ -5,7 +5,7 @@
 // (GENIPIN_PUTRESIN_v2 sensor_profile'ından türetildi) — Python
 // tarafındaki değerlerle BİREBİR aynı, uydurma/keyfi DEĞİL.
 
-typedef Rgb3 = (int r, int g, int b);
+typedef Rgb3 = ({int r, int g, int b});
 
 const Map<String, String> stateLabels = {
   'fresh': 'Taze',
@@ -14,13 +14,16 @@ const Map<String, String> stateLabels = {
 };
 
 const Map<String, ({Rgb3 light, Rgb3 dark})> stateColors = {
-  'fresh': (light: (214, 205, 196), dark: (193, 176, 160)), // 0.03125 / 0.0625 mM
-  'transition': (light: (150, 128, 112), dark: (110, 92, 84)), // 0.125 / 0.25 mM
-  'spoiled': (light: (78, 66, 66), dark: (54, 50, 58)), // 0.5 / 1.0 mM
+  'fresh': (light: (r: 214, g: 205, b: 196), dark: (r: 193, g: 176, b: 160)), // 0.03125 / 0.0625 mM
+  'transition': (light: (r: 150, g: 128, b: 112), dark: (r: 110, g: 92, b: 84)), // 0.125 / 0.25 mM
+  'spoiled': (light: (r: 78, g: 66, b: 66), dark: (r: 54, g: 50, b: 58)), // 0.5 / 1.0 mM
 };
 
 /// Henüz bir duruma atanmamış / yalnızca yerleşimi göstermek için nötr gri.
-const ({Rgb3 dark, Rgb3 light}) neutralTones = (dark: (97, 97, 97), light: (224, 224, 224));
+const ({Rgb3 dark, Rgb3 light}) neutralTones = (
+  dark: (r: 97, g: 97, b: 97),
+  light: (r: 224, g: 224, b: 224),
+);
 
 /// Tek bir modülün rengini döndürür.
 ///
@@ -29,7 +32,7 @@ const ({Rgb3 dark, Rgb3 light}) neutralTones = (dark: (97, 97, 97), light: (224,
 /// [state]: "fresh" | "transition" | "spoiled" | null (null -> nötr gri)
 Rgb3 moduleColor(int bit, bool isSensor, String? state) {
   if (!isSensor) {
-    return bit != 0 ? (0, 0, 0) : (255, 255, 255);
+    return bit != 0 ? (r: 0, g: 0, b: 0) : (r: 255, g: 255, b: 255);
   }
   final tones = (state != null ? stateColors[state] : null) ?? neutralTones;
   return bit != 0 ? tones.dark : tones.light;
@@ -74,7 +77,7 @@ Map<String, Map<String, ({int row, int col})>> finderPatternCornerPositions(int 
 }
 
 // --- Etiket kenarı referans yaması (rapor §5.2/5) ---
-const Rgb3 grayReferenceRgb = (128, 128, 128);
+const Rgb3 grayReferenceRgb = (r: 128, g: 128, b: 128);
 const int edgePatchMargin = 4;
 const int edgePatchSize = 3;
 
@@ -86,9 +89,9 @@ const int edgePatchSize = 3;
 
 const Map<String, Rgb3> edgeReferenceColors = {
   'gray': grayReferenceRgb,
-  'red': (205, 40, 40),
-  'green': (35, 150, 70),
-  'blue': (35, 95, 190),
+  'red': (r: 205, g: 40, b: 40),
+  'green': (r: 35, g: 150, b: 70),
+  'blue': (r: 35, g: 95, b: 190),
 };
 
 /// Her adlandırılmış kenar yamasının SANAL (satır, sütun) konumu.
