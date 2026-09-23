@@ -99,13 +99,20 @@ packages:
     source: sdk
     version: "0.0.0"
   image:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: image
       sha256: a1e7f4951e538a568e14b856702afc9ae1d2f4b202daced8d22c1b9cd211ce89
       url: "https://pub.dev"
     source: hosted
     version: "4.10.1"
+  label_export:
+    dependency: "direct main"
+    description:
+      path: "../../packages_dart/label_export"
+      relative: true
+    source: path
+    version: "0.0.1"
   leak_tracker:
     dependency: transitive
     description:
@@ -179,7 +186,7 @@ packages:
     source: hosted
     version: "6.5.2"
   profile_schema:
-    dependency: transitive
+    dependency: "direct main"
     description:
       path: "../../packages_dart/profile_schema"
       relative: true
@@ -194,7 +201,7 @@ packages:
     source: hosted
     version: "4.0.0"
   qr_layout:
-    dependency: transitive
+    dependency: "direct main"
     description:
       path: "../../packages_dart/qr_layout"
       relative: true

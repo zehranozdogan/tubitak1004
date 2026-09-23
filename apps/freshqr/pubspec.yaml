@@ -45,6 +45,13 @@ dependencies:
   # çağrısına geçince sadece veri kaynağı değişecek, tip aynı kalacak).
   color_engine:
     path: ../../packages_dart/color_engine
+  qr_layout:
+    path: ../../packages_dart/qr_layout
+  profile_schema:
+    path: ../../packages_dart/profile_schema
+  label_export:
+    path: ../../packages_dart/label_export
+  image: ^4.5.4
 
 dev_dependencies:
   flutter_test:
