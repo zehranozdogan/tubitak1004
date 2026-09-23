@@ -29,7 +29,9 @@
 // belgeli mimari sapma) — bkz. test/export_test.dart.
 
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:image/image.dart' as img;
 import 'package:profile_schema/profile_schema.dart' as schema;
 import 'package:qr_layout/qr_layout.dart' as qr_layout;
 
@@ -81,6 +83,72 @@ class GeneratedLabel {
 /// ile AYNI — aynı sürüm adı -> aynı reaktif hücre SAYISI/hedefi; HANGİ
 /// hücrelerin seçildiği RNG farkı yüzünden Python'la eşleşmez, bkz. dosya
 /// başlığı).
+/// `exportLabel()`'ın sonucu — Python `export_label()`'ın döndürdüğü
+/// `{"qr", "layout", "paths"}` sözlüğünün karşılığı.
+class ExportedLabel {
+  final GeneratedLabel label;
+  final Map<String, File> paths;
+
+  const ExportedLabel({required this.label, required this.paths});
+}
+
+/// Python `label_export/export.py::export_label()`'ın Dart portu — ARTIK
+/// render (`qr_layout.renderLabelImage`) DAHİL, `generateLabel()`'daki
+/// "render-öncesi" sınırı burada kalkıyor (bkz. o fonksiyonun dosya başlığı
+/// notu — bu fonksiyon o notun "render entegre olunca" dediği adımdır).
+///
+/// `outDir`'i BU FONKSİYON İÇİNDE `path_provider` ile çözmüyoruz (o,
+/// Flutter'a özel) — Python'daki gibi ÇAĞIRAN taraf hangi dizine
+/// yazılacağını verir; bu paket bu yüzden hâlâ framework'ten (Flutter'dan)
+/// bağımsız kalıyor, sadece saf `dart:io` kullanıyor.
+///
+/// Python sırası BİREBİR korunuyor: önce render (reference_regions'ı
+/// gerekiyorsa YERİNDE günceller), SONRA layout_version.json yazılır —
+/// tersi olursa dosyaya eksik/eski referans gider (bkz. Python export.py
+/// "DİKKAT" yorumu).
+Future<ExportedLabel> exportLabel(
+  schema.LabelPayload payload,
+  Directory outDir, {
+  String density = 'low',
+  int? seed,
+  Map<String, dynamic>? sensorProfile,
+}) async {
+  await outDir.create(recursive: true);
+  final generated = generateLabel(payload, density: density, seed: seed);
+
+  final neutralImage = qr_layout.renderLabelImage(
+    generated.qr,
+    generated.layoutJson,
+    sensorProfile,
+    state: null,
+  );
+  final statePngs = qr_layout.syntheticStatesPngBytes(generated.qr, generated.layoutJson, sensorProfile);
+
+  // Render sırasında reference_regions değişmiş olabilir (§6.1 B/C) —
+  // diske yazmadan önce SON haliyle tekrar doğrula (Python export.py ile aynı).
+  schema.LayoutVersionData.fromJson(generated.layoutJson);
+
+  final stem = '${payload.productId}_${payload.layoutVersion}';
+  final paths = <String, File>{
+    'payload_json': File('${outDir.path}/$stem.label_payload.json'),
+    'layout_json': File('${outDir.path}/$stem.layout_version.json'),
+    'png': File('${outDir.path}/$stem.png'),
+    'state_fresh': File('${outDir.path}/$stem.state_fresh.png'),
+    'state_transition': File('${outDir.path}/$stem.state_transition.png'),
+    'state_spoiled': File('${outDir.path}/$stem.state_spoiled.png'),
+  };
+
+  const encoder = JsonEncoder.withIndent('  ');
+  await paths['payload_json']!.writeAsString(encoder.convert(payload.toJson()));
+  await paths['layout_json']!.writeAsString(encoder.convert(generated.layoutJson));
+  await paths['png']!.writeAsBytes(img.encodePng(neutralImage));
+  await paths['state_fresh']!.writeAsBytes(statePngs['fresh']!);
+  await paths['state_transition']!.writeAsBytes(statePngs['transition']!);
+  await paths['state_spoiled']!.writeAsBytes(statePngs['spoiled']!);
+
+  return ExportedLabel(label: generated, paths: paths);
+}
+
 GeneratedLabel generateLabel(schema.LabelPayload payload, {String density = 'low', int? seed}) {
   final effectiveSeed = seed ?? qr_layout.seedFromLayoutVersion(payload.layoutVersion);
 

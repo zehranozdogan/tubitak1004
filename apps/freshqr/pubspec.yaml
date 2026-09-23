@@ -52,6 +52,7 @@ dependencies:
   label_export:
     path: ../../packages_dart/label_export
   image: ^4.5.4
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

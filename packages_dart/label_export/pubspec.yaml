@@ -16,6 +16,7 @@ dependencies:
     path: ../qr_layout
   profile_schema:
     path: ../profile_schema
+  image: ^4.5.4
 
 dev_dependencies:
   lints: ^6.0.0

@@ -1,27 +1,31 @@
-// consumer/views/admin_view.py'nin Dart portu — 1+2. adım: FORM + CANLI
-// METADATA ÖNİZLEME.
+// consumer/views/admin_view.py'nin Dart portu — 1+2+3. adım: FORM + CANLI
+// METADATA ÖNİZLEME + GERÇEK EXPORT (yerel depolama).
 //
-// 2. adımda `packages_dart/label_export` (generateLabel) + `qr_layout`
-// (renderLabelImage, bkz. render.dart) GERÇEKTEN bağlandı — "Önizle"
-// artık gerçek bir QR/etiket üretip PNG olarak gösteriyor, mock değil.
+// 3. adımda `label_export.exportLabel()` (bu adımda eklendi, bkz.
+// packages_dart/label_export/lib/src/export.dart) + `path_provider`
+// bağlandı — "Etiketi oluştur" artık gerçekten dosya yazıyor (uygulamanın
+// kendi yerel belge klasörüne, `docs/decisions/0005`teki "statik/paketli,
+// DB yok" ilkesiyle uyumlu: bu SADECE bu cihazın kendi ürettiği etiketlerin
+// GEÇMİŞİ, dağıtılan referans verisiyle (sensor_profile/layout_version)
+// KARIŞTIRILMASIN — o ayrı, bundled/statik kalıyor).
 //
-// BİLİNEN EKSİK (TODO, sonraki adım): `_sensorProfile` şu an SABİT bir
-// stub (`{'calibration_method': {'code': 'white_black'}}`) — gerçek
-// sensor_profile.json dosyasının Flutter asset olarak paketlenip
-// (`profile_schema` loader'ıyla) okunması ayrı bir iş (docs/decisions/
-// 0005 — bundled statik veri). Bu yüzden B/C kalibrasyon yöntemleri
-// önizlemede henüz seçilemez, hep A (white_black) davranır.
+// CustomPainter'a hâlâ gerek yok — renderLabelImage zaten piksel üretiyor,
+// Image.memory ile gösteriliyor (bkz. önceki adımın notu).
 //
-// "Etiketi oluştur" (gerçek dosya/yerel depolamaya export) hâlâ 3. adım —
-// CustomPainter'a asıl ihtiyaç YOK aslında (renderLabelImage zaten piksel
-// üretiyor, Image.memory ile gösterilebiliyor) — 3. adımda asıl eksik olan
-// dosya/yerel depolama (path_provider) tarafı.
+// BİLİNEN EKSİK (TODO): `_sensorProfile` hâlâ SABİT bir stub
+// (`{'calibration_method': {'code': 'white_black'}}`) — gerçek
+// sensor_profile.json'ın Flutter asset olarak paketlenmesi (karar 0005)
+// ayrı bir iş, B/C kalibrasyon yöntemleri henüz seçilemiyor.
+// PDF export de yok (qr_layout/render.dart'ta bilerek kapsam dışı bırakıldı,
+// ayrı bir `pdf` paketi gerekiyor).
 
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:label_export/label_export.dart' as label_export;
+import 'package:path_provider/path_provider.dart';
 import 'package:profile_schema/profile_schema.dart' as schema;
 import 'package:qr_layout/qr_layout.dart' as qr_layout;
 
@@ -41,6 +45,11 @@ const List<String> _layoutVersions = ['QR_SENSOR_v4'];
 // 'medium' kaldırıldı — bkz. docs/decisions (medium/high ayırt edilemiyordu).
 const List<String> _densityOptions = ['low', 'high'];
 
+const String _batchPrefix = 'TR';
+const int _batchStart = 45678; // rapor örneğindeki ilk parti no (§8, §10.1)
+
+const Map<String, String> _stateLabels = {'fresh': 'Taze', 'transition': 'Geçiş', 'spoiled': 'Bozuk'};
+
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
 
@@ -50,7 +59,7 @@ class AdminScreen extends StatefulWidget {
 
 class _AdminScreenState extends State<AdminScreen> {
   String _productType = _commonSpecies.first;
-  final _productIdController = TextEditingController(text: 'TR45678');
+  final _productIdController = TextEditingController(text: '$_batchPrefix$_batchStart');
   final _productionDateController = TextEditingController();
   String _sensorProfileId = _sensorProfileIds.first;
   String _layoutVersion = _layoutVersions.first;
@@ -61,11 +70,17 @@ class _AdminScreenState extends State<AdminScreen> {
   String? _statusText;
   bool _statusIsError = false;
   List<(String, String)> _meta = [];
+  List<(String, Uint8List)> _statePreviews = [];
+  List<String> _outputFilePaths = [];
+  bool _exporting = false;
+
+  Directory? _labelsDir;
 
   @override
   void initState() {
     super.initState();
     _productionDateController.text = _todayDdMmYyyy();
+    _initBatchNo();
   }
 
   @override
@@ -73,6 +88,45 @@ class _AdminScreenState extends State<AdminScreen> {
     _productIdController.dispose();
     _productionDateController.dispose();
     super.dispose();
+  }
+
+  /// Python `_next_batch_no`: yerel klasördeki mevcut etiketleri tarayıp bir
+  /// sonraki sıralı parti numarasını üretir — üretici parti no'yu elle
+  /// girmiyor.
+  ///
+  /// Yerel depolamaya (path_provider) erişim başarısız olursa (ör. test
+  /// ortamı, ya da henüz platform desteği kurulmamış bir hedef) SESSİZCE
+  /// vazgeçer — ekran çökmez, sadece parti no varsayılan ($_batchStart)
+  /// kalır; kullanıcı "Etiketi oluştur"a bastığında GERÇEK hata orada
+  /// (try/catch'li `_export`'ta) görünür.
+  Future<void> _initBatchNo() async {
+    try {
+      final dir = await _ensureLabelsDir();
+      var used = <int>[];
+      if (await dir.exists()) {
+        await for (final entry in dir.list()) {
+          if (entry is! File) continue;
+          final name = entry.uri.pathSegments.last;
+          if (!name.startsWith(_batchPrefix) || !name.endsWith('.label_payload.json')) continue;
+          final digits = name.substring(_batchPrefix.length).split('_').first;
+          final n = int.tryParse(digits);
+          if (n != null) used.add(n);
+        }
+      }
+      final next = used.isEmpty ? _batchStart : (used.reduce((a, b) => a > b ? a : b) + 1);
+      if (mounted) setState(() => _productIdController.text = '$_batchPrefix$next');
+    } catch (_) {
+      // bkz. yukarıdaki doküman notu — best-effort, sessiz vazgeçiş.
+    }
+  }
+
+  Future<Directory> _ensureLabelsDir() async {
+    if (_labelsDir != null) return _labelsDir!;
+    final docs = await getApplicationDocumentsDirectory();
+    final dir = Directory('${docs.path}/labels');
+    await dir.create(recursive: true);
+    _labelsDir = dir;
+    return dir;
   }
 
   String _todayDdMmYyyy() {
@@ -83,6 +137,20 @@ class _AdminScreenState extends State<AdminScreen> {
 
   void _resetProductionDate() {
     setState(() => _productionDateController.text = _todayDdMmYyyy());
+  }
+
+  /// Ekrandaki mevcut parti no'yu 1 artırır (Python `regenerate_batch_no`
+  /// ile aynı fikir: diski YENİDEN taramak, iki tıklama arasında hiçbir şey
+  /// değişmediyse aynı sayıyı verir, görünürde "çalışmıyor" gibi durur —
+  /// bunun yerine ekrandaki sayıyı ilerletiyoruz; ilk değer hâlâ
+  /// `_initBatchNo` ile diskten güvenle başlatılıyor).
+  Future<void> _regenerateBatchNo() async {
+    final current = int.tryParse(_productIdController.text.replaceFirst(_batchPrefix, ''));
+    if (current != null) {
+      setState(() => _productIdController.text = '$_batchPrefix${current + 1}');
+    } else {
+      await _initBatchNo();
+    }
   }
 
   /// Python `_to_iso_date`: "GG.AA.YYYY" -> "YYYY-AA-GG". Ayrıştırılamazsa
@@ -153,7 +221,9 @@ class _AdminScreenState extends State<AdminScreen> {
           ('ECC', 'H'),
           ('Kalibrasyon', calibrationCode),
         ];
-        _statusText = "Gri noktalar = reaktif sensör hücreleri. 'Etiketi oluştur' 3. adımda eklenecek.";
+        _statePreviews = [];
+        _outputFilePaths = [];
+        _statusText = "Gri noktalar = reaktif sensör hücreleri. 'Etiketi oluştur' ile dosyaları üret.";
         _statusIsError = false;
       });
     } catch (ex) {
@@ -163,7 +233,66 @@ class _AdminScreenState extends State<AdminScreen> {
         _statusIsError = true;
         _previewPngBytes = null;
         _meta = [];
+        _statePreviews = [];
+        _outputFilePaths = [];
       });
+    }
+  }
+
+  Future<void> _export() async {
+    setState(() => _exporting = true);
+    try {
+      final payload = label_export.buildLabelPayload(
+        productId: _productIdController.text,
+        productType: _productType,
+        productionDate: _toIsoDate(_productionDateController.text),
+        sensorProfileId: _sensorProfileId,
+        layoutVersion: _layoutVersion,
+      );
+      final sensorProfile = _sensorProfileStub();
+      final dir = await _ensureLabelsDir();
+      final result = await label_export.exportLabel(
+        payload,
+        dir,
+        density: _density,
+        sensorProfile: sensorProfile,
+      );
+
+      final neutralBytes = await result.paths['png']!.readAsBytes();
+      final calibrationCode =
+          (sensorProfile['calibration_method'] as Map<String, dynamic>)['code'] as String;
+
+      final statePreviews = <(String, Uint8List)>[];
+      for (final key in const ['fresh', 'transition', 'spoiled']) {
+        final bytes = await result.paths['state_$key']!.readAsBytes();
+        statePreviews.add((_stateLabels[key]!, bytes));
+      }
+
+      setState(() {
+        _previewVisible = true;
+        _previewPngBytes = neutralBytes;
+        _meta = [
+          ('Parti no', payload.productId),
+          ('QR versiyonu', 'v${result.label.qr.version}'),
+          ('Matris', '${result.label.layout.matrixSize}'),
+          ('Reaktif modül', '${result.label.layout.sensorModules.length}'),
+          ('Yoğunluk', _density),
+          ('Kalibrasyon', calibrationCode),
+        ];
+        _statePreviews = statePreviews;
+        _outputFilePaths = [for (final f in result.paths.values) f.path];
+        _statusText = "Dosyalar '${dir.path}' altına yazıldı.";
+        _statusIsError = false;
+      });
+      await _regenerateBatchNo();
+    } catch (ex) {
+      setState(() {
+        _previewVisible = true;
+        _statusText = 'Hata: $ex';
+        _statusIsError = true;
+      });
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
   }
 
@@ -202,7 +331,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   tooltip: 'Yeni parti no üret',
-                  onPressed: null, // TODO 3. adım: yerel depolama taranarak gerçek sayaç
+                  onPressed: () => _regenerateBatchNo(),
                 ),
               ],
             ),
@@ -261,8 +390,8 @@ class _AdminScreenState extends State<AdminScreen> {
                 Expanded(
                   child: FilledButton.icon(
                     icon: const Icon(Icons.qr_code_2),
-                    label: const Text('Etiketi oluştur'),
-                    onPressed: null, // TODO 3. adım: yerel depolamaya export
+                    label: Text(_exporting ? 'Oluşturuluyor…' : 'Etiketi oluştur'),
+                    onPressed: _exporting ? null : _export,
                   ),
                 ),
               ],
@@ -274,9 +403,9 @@ class _AdminScreenState extends State<AdminScreen> {
             title: 'Etiket önizleme',
             children: [
               Text(
-                "Girdiğin bilgilere göre oluşan QR'ın canlı önizlemesi — henüz "
-                'hiçbir dosya kaydedilmedi. Gri noktalar reaktif sensör hücrelerinin '
-                'yerleşimini gösterir (henüz bir tazelik durumu değil).',
+                "Girdiğin bilgilere göre oluşan QR'ın canlı önizlemesi. Gri "
+                'noktalar reaktif sensör hücrelerinin yerleşimini gösterir '
+                '(henüz bir tazelik durumu değil).',
                 style: TextStyle(color: muted, fontSize: AppTextSizes.caption),
               ),
               const SizedBox(height: AppSpacing.s),
@@ -304,6 +433,43 @@ class _AdminScreenState extends State<AdminScreen> {
               if (_meta.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.s),
                 for (final entry in _meta) KvRow(entry.$1, entry.$2),
+              ],
+              if (_statePreviews.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.m),
+                Text(
+                  'Sentetik durumlar (§8)',
+                  style: TextStyle(color: muted, fontSize: AppTextSizes.caption, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Wrap(
+                  spacing: AppSpacing.s,
+                  runSpacing: AppSpacing.s,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    for (final entry in _statePreviews)
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 110,
+                            height: 110,
+                            child: Image.memory(entry.$2, fit: BoxFit.contain),
+                          ),
+                          Text(entry.$1, style: TextStyle(color: muted, fontSize: AppTextSizes.caption)),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+              if (_outputFilePaths.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.m),
+                Text(
+                  'Çıktı dosyaları',
+                  style: TextStyle(color: muted, fontSize: AppTextSizes.caption, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                for (final path in _outputFilePaths)
+                  Text(path, style: TextStyle(color: muted, fontSize: AppTextSizes.caption)),
               ],
             ],
           ),

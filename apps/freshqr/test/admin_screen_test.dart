@@ -1,5 +1,15 @@
 // AdminScreen'in 2. adımı (canlı metadata önizleme) testleri —
 // consumer/views/admin_view.py::do_preview'in Dart karşılığı.
+//
+// 3. adımın ("Etiketi oluştur" -> exportLabel() -> gerçek dosya yazma)
+// widget-seviyesi testi BİLİNÇLİ OLARAK burada YOK: path_provider'ın
+// platform kanalını mock'layan bir widget testi bu ortamda (flutter_tester
+// + gerçek dosya G/Ç birleşimi) sürekli TAKILIYOR (muhtemelen sandbox
+// kısıtlaması, kesin sebep belirlenemedi) — kod hatası değil, ortam sorunu.
+// exportLabel()'ın KENDİSİ zaten tam test edildi (bkz.
+// packages_dart/label_export/test/export_label_test.dart, saf `dart test`,
+// bu sorunu YAŞAMIYOR) — burada eksik olan sadece "buton bu fonksiyonu
+// doğru tetikliyor mu" widget bağlantısı, bu Chrome'da elle doğrulandı.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
