@@ -1,0 +1,22 @@
+name: label_export
+description: >
+  packages/label_export (Python) etiket üretim orkestrasyonunun Dart
+  portu — SADECE render-öncesi kısım (generate_qr -> reactive_candidates
+  -> select_reactive_modules -> build_layout -> validate). Render (PNG/PDF,
+  kalibrasyona göre ekstra referans yaması ekleme) BİLİNÇLİ OLARAK YOK —
+  bkz. lib/src/export.dart dosya başlığı.
+publish_to: "none"
+version: 0.0.1
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  qr_layout:
+    path: ../qr_layout
+  profile_schema:
+    path: ../profile_schema
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

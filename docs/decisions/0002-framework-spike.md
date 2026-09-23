@@ -31,7 +31,14 @@ CIEDE2000, ≥2 QR decoder, kalite skoru, offline. Bu gereksinimler ışığınd
 
 ## Spike çıktısı (Hafta-1 sonu)
 
-- [ ] Flutter + native Android için: kamera akışı + QR köşe + basit ROI okuma mini-denemesi
+- [x] Flutter + native Android için: kamera akışı + QR köşe + basit ROI okuma
+      mini-denemesi — `apps/flutter_camera_spike/` (21 Eylül, 22 Eylül'de
+      Flutter+Java+Android SDK kurulup GERÇEKTEN derlendi: `flutter build
+      apk --debug` başarılı, çalıştırılabilir bir APK üretildi). DİKKAT:
+      derlenmek ≠ gerçek cihazda çalışmak — kamera hâlâ fiziksel bir
+      Android cihazda test edilmedi (bu ortamda cihaz yok). Bu madde
+      "derleniyor, taslak sağlam" sayılabilir ama "kamera gerçekten
+      çalışıyor" henüz kanıtlanmadı.
 - [ ] Kriter bazlı puan tablosu (yukarıdaki tablo doldurulur)
 - [ ] **Karar** + gerekçe → bu dosya "kabul edildi" yapılır
 - [ ] `apps/consumer/` seçilen framework ile yeniden iskeletlenir
