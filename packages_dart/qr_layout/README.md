@@ -54,10 +54,9 @@ distance transform, safety score, crc32) ise gerçek Python ile BİREBİR.
 
 - `render.py` (SVG/PNG rasterize) — Flutter'da `CustomPainter` ile yeniden
   yazılacak (zehra bunu yapıyor), doğrudan port değil.
-- `label_export/export.py` orkestrasyonu (generate_qr -> reactive_candidates
-  -> select_reactive_modules -> build_layout -> validate -> render -> kaydet)
-  henüz Flutter tarafında BİRLEŞTİRİLMEDİ — parçalar (bu paket, profile_schema,
-  render) ayrı ayrı hazır, uçtan uca "etiket üret" akışı henüz yok.
+- `label_export/export.py` orkestrasyonu render-ÖNCESİ kısmıyla port edildi
+  (23 Eylül, `packages_dart/label_export`) — render entegre olunca (zehra)
+  kalibrasyon-özel referans yaması ekleme adımı da eklenecek.
 
 `packages_dart/color_engine` artık bu pakete BAĞIMLI (23 Eylül'de
 temizlendi — önceden `finder_pattern.dart` diye kısmi bir kopyası vardı,

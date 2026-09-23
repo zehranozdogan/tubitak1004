@@ -86,6 +86,7 @@ mobil) çalışır.
 - Gerçek kamera/ML Kit entegrasyonu ile bu paketin birleştirilmesi
   (`apps/flutter_camera_spike`'ın `color_pipeline_stub.dart`'ı bu paketle
   değiştirilecek).
-- `multicolor_patch` kalibrasyon YOLUNUN `pipeline_test.dart`'ta ayrıca
-  uçtan uca test edilmesi (şu an sadece `calibration_test.dart`'ta izole
-  test edildi, pipeline orkestrasyonu içinde henüz değil).
+- `multicolor_patch` kalibrasyon YOLU artık `pipeline_test.dart`'ta uçtan
+  uca test EDİLDİ (23 Eylül — 6 referans noktası, `calibration_test.dart`'taki
+  gerçek numpy.linalg.lstsq ile doğrulanmış sabitlerin AYNISI kullanılarak);
+  74/74 test geçiyor.

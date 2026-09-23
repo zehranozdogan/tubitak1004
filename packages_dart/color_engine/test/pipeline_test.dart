@@ -211,6 +211,75 @@ void main() {
     expect(result.freshnessClass, 'fresh');
   });
 
+  test(
+      'multicolor_patch kalibrasyonu: uçtan uca (>=4 referans noktası, '
+      'calibration_test.dart\'taki gerçek numpy.linalg.lstsq ile doğrulanmış '
+      'sabitlerin AYNISI kullanılarak)', () {
+    // Bu testin amacı fitMulticolorPatch/applyMulticolorPatch'in matematiğini
+    // TEKRAR doğrulamak DEĞİL (bkz. calibration_test.dart — orada gerçek
+    // Python numpy.linalg.lstsq çıktısıyla bit bit doğrulandı); amaç SADECE
+    // pipeline.dart'ın layout_version.reference_regions'tan 6 referans
+    // noktasını (white/black/gray/red/green/blue) DOĞRU SIRAYLA okuyup
+    // fitMulticolorPatch/applyMulticolorPatch'e doğru aktardığını ve
+    // sonucun sensör hücrelerine doğru uygulandığını uçtan uca kanıtlamak.
+    // captured/trueColors DEĞERLERİ ve beklenen düzeltilmiş piksel
+    // calibration_test.dart'la BİREBİR AYNI (kopyalanmadı, oradan alındı).
+    const capturedWhite = Rgb(240, 235, 230);
+    const capturedBlack = Rgb(10, 12, 15);
+    const capturedGray = Rgb(128, 124, 120);
+    const capturedRed = Rgb(200, 60, 50);
+    const capturedGreen = Rgb(50, 180, 70);
+    const capturedBlue = Rgb(60, 70, 190);
+    const capturedSensor = Rgb(150, 100, 80);
+    // calibration_test.dart 'düzeltilmiş pikseller gerçek Python çıktısıyla
+    // eşleşir' testinde AYNI 6 referansla Rgb(150,100,80) -> Rgb(152,89,78).
+    const correctedSensorRgb = Rgb(152, 89, 78);
+
+    final refPositions = <String, ({int row, int col})>{
+      'white': (row: -2, col: 2),
+      'black': (row: -2, col: 5),
+      'gray': (row: -2, col: 8),
+      'red': (row: -2, col: 11),
+      'green': (row: -2, col: 14),
+      'blue': (row: -2, col: 17),
+    };
+    final refColors = <String, Rgb>{
+      'white': capturedWhite,
+      'black': capturedBlack,
+      'gray': capturedGray,
+      'red': capturedRed,
+      'green': capturedGreen,
+      'blue': capturedBlue,
+    };
+
+    final modules = {
+      ...baseModules(capturedSensor),
+      for (final entry in refPositions.entries) entry.value: refColors[entry.key]!,
+    };
+    final image = _buildCanonicalLikePhoto(background: const Rgb(128, 128, 128), modules: modules);
+
+    final correctedLab = rgbToLab(correctedSensorRgb);
+    final scalePointsHere = [
+      schema.ScalePointEntry(value: 0.0, lab: [correctedLab.L, correctedLab.a, correctedLab.b], state: 'spoiled'),
+      schema.ScalePointEntry(value: 1.0, lab: [freshLab.L, freshLab.a, freshLab.b], state: 'fresh'),
+    ];
+
+    final result = analyzeFrame(
+      image,
+      sensorProfile: _profile(scalePoints: scalePointsHere, hasClassThresholds: true, calibrationCode: 'multicolor_patch'),
+      layoutVersion: _layout(
+        sensorModules: sensorModules,
+        referenceRegions: {for (final e in refPositions.entries) e.key: [(e.value.row, e.value.col)]},
+      ),
+      qrCorners: _identityCorners(),
+    );
+
+    expect(result.rescanRecommended, isFalse);
+    expect(result.notes, isEmpty); // yeterli referans var, hiçbir fallback/uyarı tetiklenmemeli
+    expect(result.freshnessClass, 'spoiled');
+    expect(result.deltaE, closeTo(0.0, 0.5)); // düzeltilmiş sensör rengi scale_point'e TAM denk geliyor
+  });
+
   test('köşe tutarsızlığı notu: bir finder köşesinin beyazı belirgin farklıysa uyarı eklenir', () {
     final modules = baseModules(freshRgb);
     // top_right köşesinin beyazını KOYU yaparak (255->80) belirgin bir
