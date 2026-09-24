@@ -1,0 +1,19 @@
+{
+  "profile_id": "GENIPIN_PUTRESIN_v2",
+  "analyte_axis": "putresin_mM",
+  "scale_points": [
+    { "value": 0.03125, "rgb": [214, 205, 196], "lab": [82.5, 1.5, 6.0], "state": null },
+    { "value": 0.0625,  "rgb": [193, 176, 160], "lab": [73.0, 3.5, 11.0], "state": null },
+    { "value": 0.125,   "rgb": [150, 128, 112], "lab": [56.0, 6.0, 15.0], "state": null },
+    { "value": 0.25,    "rgb": [110, 92, 84],   "lab": [41.0, 7.0, 10.0], "state": null },
+    { "value": 0.5,     "rgb": [78, 66, 66],    "lab": [29.5, 5.0, 3.0],  "state": null },
+    { "value": 1.0,     "rgb": [54, 50, 58],    "lab": [21.5, 2.0, -4.0], "state": null }
+  ],
+  "calibration_method": {
+    "code": "white_black",
+    "params": { "note": "baslangic adayi; A-E karsilastirmasi tests/synthetic altinda yapilacak (§6.1)" }
+  },
+  "class_thresholds": null,
+  "quality_gate": { "min_quality_score": 0.5 },
+  "output_fields": ["technical_level", "analyte", "delta_e", "confidence"]
+}

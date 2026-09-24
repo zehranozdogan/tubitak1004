@@ -11,8 +11,11 @@
 // bu sorunu YAŞAMIYOR) — burada eksik olan sadece "buton bu fonksiyonu
 // doğru tetikliyor mu" widget bağlantısı, bu Chrome'da elle doğrulandı.
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:freshqr/data/reference_data.dart';
 import 'package:freshqr/screens/admin/admin_screen.dart';
 
 void main() {
@@ -25,7 +28,7 @@ void main() {
 
   testWidgets("Önizle: varsayılan form değerleriyle gerçek bir QR üretir, meta satırları gösterir", (tester) async {
     await useTallSurface(tester);
-    await tester.pumpWidget(const MaterialApp(home: AdminScreen()));
+    await tester.pumpWidget(MaterialApp(home: AdminScreen(reference: ReferenceData((p) => File(p).readAsString()))));
     await tester.pumpAndSettle();
 
     // Buton basılana kadar önizleme kartı hiç yok.
@@ -48,27 +51,33 @@ void main() {
     expect(find.textContaining('Geçersiz girdi'), findsNothing);
   });
 
-  testWidgets('Yoğunluk değiştirip tekrar Önizle -> çökmeden yeni önizleme üretir', (tester) async {
+  testWidgets('Yoğunluk kullanıcı seçimi değil: layout tarifinden gelir (salt okunur), profil değişince önizleme çökmez', (tester) async {
     await useTallSurface(tester);
-    await tester.pumpWidget(const MaterialApp(home: AdminScreen()));
+    await tester.pumpWidget(MaterialApp(home: AdminScreen(reference: ReferenceData((p) => File(p).readAsString()))));
     await tester.pumpAndSettle();
+
+    // Paketli asset'ler (rootBundle) gerçek G/Ç ile okunur — bekle.
+    for (var i = 0; i < 10; i++) {
+      await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 30)));
+      await tester.pump();
+    }
+
+    expect(find.text('Layout yoğunluğu (layout_version tarifinden)'), findsOneWidget);
+    expect(find.text('low'), findsOneWidget); // QR_SENSOR_v4 tarifi
+
+    // sensor_profile'ı DEMO profiline çevir (paketli asset listesinden):
+    // 2. açılır liste (0=ürün türü, 1=sensor_profile_id, 2=layout_version).
+    await tester.tap(find.byType(DropdownButtonFormField<String>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DEMO_QR_STATE_COLORS_v1').last);
+    for (var i = 0; i < 10; i++) {
+      await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 30)));
+      await tester.pump();
+    }
 
     await tester.tap(find.text('Önizle'));
     await tester.pumpAndSettle();
-    expect(find.text('Etiket önizleme'), findsOneWidget);
 
-    // "Layout yoğunluğu" dropdown'ını 'low' -> 'high'a çevir.
-    await tester.tap(find.text('low').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('high').last);
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Önizle'));
-    await tester.pumpAndSettle();
-
-    // Sayısal karşılaştırma (daha yoğun -> daha çok reaktif modül) zaten
-    // qr_layout/reactive_test.dart'ta doğrulanıyor — burada asıl kontrol
-    // edilen: form değişince önizleme ÇÖKMEDEN, hatasız yeniden üretiliyor.
     expect(find.text('Etiket önizleme'), findsOneWidget);
     expect(find.textContaining('Geçersiz girdi'), findsNothing);
   });

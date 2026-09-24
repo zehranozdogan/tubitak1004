@@ -3,15 +3,21 @@
 // kısıtı) yerine burada gerçek Flutter State + IndexedStack-benzeri bir
 // switch kullanıldı (Flutter'da routing zaten var, o kısıtlama YOK).
 //
-// UI-FIRST (bkz. proje kararı, 23 Eylül): kamera/gerçek color_engine
-// bağlantısı YOK — "Tazelik Tara" ve test senaryoları mock_results.dart'taki
-// GERÇEK ColorEngineResult tipiyle kurulmuş sabit verileri gösterir.
-// Kamera entegrasyonu geldiğinde yalnızca `_runScan` çağrılarının kaynağı
-// değişecek (mock -> analyzeFrame()), akış/ekranlar AYNI kalacak.
+// Kamera HENÜZ YOK: "Tazelik Tara" ve "Test senaryoları" mock_results.dart'taki
+// GERÇEK ColorEngineResult tipiyle sabit verileri gösterir. "Dosyadan test et"
+// ise GERÇEK: bu cihazda üretilmiş bir etiketin durum görselini tüm okuyucu
+// zincirinden geçirir (services/file_scan.dart). Kamera geldiğinde yalnızca
+// görüntü/QR-metni kaynağı değişecek, zincir AYNI kalacak.
+
+import 'dart:io';
 
 import 'package:color_engine/color_engine.dart';
 import 'package:flutter/material.dart';
 
+import '../../data/label_store.dart';
+import '../../data/reference_data.dart';
+import '../../services/file_scan.dart';
+import '../../services/scan_service.dart';
 import '../../widgets/app_screen.dart';
 import 'mock_results.dart';
 import 'widgets/invalid_qr_view.dart';
@@ -22,7 +28,11 @@ import 'widgets/scan_view.dart';
 enum _ViewState { scan, result, permissionDenied, invalidQr }
 
 class UserScreen extends StatefulWidget {
-  const UserScreen({super.key});
+  /// Test için enjekte edilebilir; null ise uygulama belge dizini/labels ve rootBundle.
+  final Directory? labelsDir;
+  final ReferenceData? reference;
+
+  const UserScreen({super.key, this.labelsDir, this.reference});
 
   @override
   State<UserScreen> createState() => _UserScreenState();
@@ -32,6 +42,43 @@ class _UserScreenState extends State<UserScreen> {
   _ViewState _view = _ViewState.scan;
   ColorEngineResult? _result;
   LabelInfo? _labelInfo;
+  List<StoredLabel> _storedLabels = const [];
+  Directory? _dir;
+  late final ReferenceData _reference = widget.reference ?? ReferenceData();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStoredLabels();
+  }
+
+  Future<void> _loadStoredLabels() async {
+    try {
+      final dir = widget.labelsDir ?? await defaultLabelsDir();
+      final labels = await loadLabels(dir);
+      if (mounted) {
+        setState(() {
+          _dir = dir;
+          _storedLabels = labels;
+        });
+      }
+    } catch (_) {
+      // Yerel depolama yok (ör. web): dosya testi kartı boş görünür.
+    }
+  }
+
+  Future<void> _fileScan(StoredLabel label, String state) async {
+    final dir = _dir;
+    if (dir == null) return;
+    final outcome = await scanStoredLabel(dir: dir, stem: label.stem, state: state, reference: _reference);
+    if (!mounted) return;
+    switch (outcome) {
+      case ScanSuccess(:final result, :final labelInfo):
+        _runScan(result, labelInfo);
+      case ScanInvalidQr():
+        _showInvalidQr();
+    }
+  }
 
   void _showScan() => setState(() => _view = _ViewState.scan);
 
@@ -59,7 +106,12 @@ class _UserScreenState extends State<UserScreen> {
     ];
 
     final Widget body = switch (_view) {
-      _ViewState.scan => ScanView(onScan: () => _runScan(mockOk), testScenarios: testScenarios),
+      _ViewState.scan => ScanView(
+        onScan: () => _runScan(mockOk),
+        testScenarios: testScenarios,
+        storedLabels: _storedLabels,
+        onFileScan: _fileScan,
+      ),
       _ViewState.result => ResultView(result: _result!, labelInfo: _labelInfo!, onRescan: _showScan),
       _ViewState.permissionDenied => PermissionDeniedView(onRetry: _showScan),
       _ViewState.invalidQr => InvalidQrView(onRetry: _showScan),

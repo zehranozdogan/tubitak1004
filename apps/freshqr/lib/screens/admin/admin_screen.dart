@@ -12,11 +12,10 @@
 // CustomPainter'a hâlâ gerek yok — renderLabelImage zaten piksel üretiyor,
 // Image.memory ile gösteriliyor (bkz. önceki adımın notu).
 //
-// BİLİNEN EKSİK (TODO): `_sensorProfile` hâlâ SABİT bir stub
-// (`{'calibration_method': {'code': 'white_black'}}`) — gerçek
-// sensor_profile.json'ın Flutter asset olarak paketlenmesi (karar 0005)
-// ayrı bir iş, B/C kalibrasyon yöntemleri henüz seçilemiyor.
-// PDF export de yok (qr_layout/render.dart'ta bilerek kapsam dışı bırakıldı,
+// 24 Eylül: sensor_profile ve layout tarifi artık paketli asset'ten
+// (`data/reference_data.dart`, karar 0005) yükleniyor; yoğunluk kullanıcı
+// seçimi değil, layout_version tarifinden geliyor (okuyucu aynı tarifle
+// hücreleri yeniden türetiyor). PDF export yok (qr_layout/render.dart'ta bilerek kapsam dışı bırakıldı,
 // ayrı bir `pdf` paketi gerekiyor).
 
 import 'dart:io';
@@ -33,18 +32,15 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_screen.dart';
 import '../../widgets/kv_row.dart';
 import '../../widgets/section_card.dart';
+import '../../data/reference_data.dart';
 import '../labels/labels_screen.dart';
 
 const List<String> _commonSpecies = ['LEVREK', 'ÇİPURA', 'SOMON', 'ALABALIK'];
 
-// packages/profile_schema/examples/ altında GERÇEKTEN var olan profil/
-// sürümler — bundled asset okuma bağlanınca (TODO yukarıda) buradan gelecek,
-// şimdilik tek örnekle sabit.
-const List<String> _sensorProfileIds = ['GENIPIN_PUTRESIN_v2'];
-const List<String> _layoutVersions = ['QR_SENSOR_v4'];
-
-// 'medium' kaldırıldı — bkz. docs/decisions (medium/high ayırt edilemiyordu).
-const List<String> _densityOptions = ['low', 'high'];
+// Açılıştaki varsayılanlar; paketli referans veri (ReferenceData, karar 0005)
+// yüklenince gerçek listelerle değiştirilir.
+const List<String> _fallbackSensorProfileIds = ['GENIPIN_PUTRESIN_v2'];
+const List<String> _fallbackLayoutVersions = ['QR_SENSOR_v4'];
 
 const String _batchPrefix = 'TR';
 const int _batchStart = 45678; // rapor örneğindeki ilk parti no (§8, §10.1)
@@ -52,7 +48,10 @@ const int _batchStart = 45678; // rapor örneğindeki ilk parti no (§8, §10.1)
 const Map<String, String> _stateLabels = {'fresh': 'Taze', 'transition': 'Geçiş', 'spoiled': 'Bozuk'};
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key});
+  /// Test için enjekte edilebilir (paketli asset okuyucusu); null ise rootBundle.
+  final ReferenceData? reference;
+
+  const AdminScreen({super.key, this.reference});
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -62,9 +61,16 @@ class _AdminScreenState extends State<AdminScreen> {
   String _productType = _commonSpecies.first;
   final _productIdController = TextEditingController(text: '$_batchPrefix$_batchStart');
   final _productionDateController = TextEditingController();
-  String _sensorProfileId = _sensorProfileIds.first;
-  String _layoutVersion = _layoutVersions.first;
+  late final ReferenceData _reference = widget.reference ?? ReferenceData();
+  List<String> _sensorProfileIds = _fallbackSensorProfileIds;
+  List<String> _layoutVersions = _fallbackLayoutVersions;
+  String _sensorProfileId = _fallbackSensorProfileIds.first;
+  String _layoutVersion = _fallbackLayoutVersions.first;
+  // Yoğunluk KULLANICI SEÇİMİ DEĞİL: layout_version tarifinden gelir —
+  // okuyucu hücreleri aynı tarifle yeniden türettiği için ikisi aynı olmak
+  // zorunda (24 Eylül kararı, bkz. data/reference_data.dart).
   String _density = 'low';
+  Map<String, dynamic>? _sensorProfileRaw;
 
   bool _previewVisible = false;
   Uint8List? _previewPngBytes;
@@ -82,6 +88,39 @@ class _AdminScreenState extends State<AdminScreen> {
     super.initState();
     _productionDateController.text = _todayDdMmYyyy();
     _initBatchNo();
+    _loadReference();
+  }
+
+  Future<void> _loadReference() async {
+    try {
+      final profiles = await _reference.sensorProfileIds();
+      final layouts = await _reference.layoutVersions();
+      if (!mounted) return;
+      setState(() {
+        _sensorProfileIds = profiles;
+        _layoutVersions = layouts;
+        _sensorProfileId = profiles.first;
+        _layoutVersion = layouts.first;
+      });
+      await _applySelection();
+    } catch (_) {
+      // Paketli veri okunamazsa varsayılanlarla (white_black, low) devam.
+    }
+  }
+
+  /// Seçili sensor_profile'ı ve layout tarifini (yoğunluk) yükler.
+  Future<void> _applySelection() async {
+    try {
+      final profile = await _reference.sensorProfile(_sensorProfileId);
+      final recipe = await _reference.layoutRecipe(_layoutVersion);
+      if (!mounted) return;
+      setState(() {
+        _sensorProfileRaw = profile.raw;
+        _density = recipe.moduleDensity;
+      });
+    } catch (_) {
+      // yüklenemedi: önceki değerler kalır.
+    }
   }
 
   @override
@@ -175,12 +214,12 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  /// TODO (yukarıdaki dosya başlığı): gerçek sensor_profile.json'dan
-  /// (bundled asset) gelecek — şimdilik sabit.
+  /// Seçili profilin GERÇEK (paketli) JSON'u; henüz yüklenmediyse white_black.
   Map<String, dynamic> _sensorProfileStub() {
-    return {
-      'calibration_method': {'code': 'white_black'},
-    };
+    return _sensorProfileRaw ??
+        {
+          'calibration_method': {'code': 'white_black'},
+        };
   }
 
   void _preview() {
@@ -317,6 +356,7 @@ class _AdminScreenState extends State<AdminScreen> {
           title: 'Etiket bilgisi',
           children: [
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _productType,
               decoration: const InputDecoration(labelText: 'Ürün türü', prefixIcon: Icon(Icons.set_meal)),
               items: [for (final s in _commonSpecies) DropdownMenuItem(value: s, child: Text(s))],
@@ -365,24 +405,33 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
             const SizedBox(height: AppSpacing.s),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _sensorProfileId,
               decoration: const InputDecoration(labelText: 'sensor_profile_id', prefixIcon: Icon(Icons.science)),
               items: [for (final p in _sensorProfileIds) DropdownMenuItem(value: p, child: Text(p))],
-              onChanged: (v) => setState(() => _sensorProfileId = v ?? _sensorProfileId),
+              onChanged: (v) async {
+                setState(() => _sensorProfileId = v ?? _sensorProfileId);
+                await _applySelection();
+              },
             ),
             const SizedBox(height: AppSpacing.s),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _layoutVersion,
               decoration: const InputDecoration(labelText: 'layout_version', prefixIcon: Icon(Icons.grid_view)),
               items: [for (final l in _layoutVersions) DropdownMenuItem(value: l, child: Text(l))],
-              onChanged: (v) => setState(() => _layoutVersion = v ?? _layoutVersion),
+              onChanged: (v) async {
+                setState(() => _layoutVersion = v ?? _layoutVersion);
+                await _applySelection();
+              },
             ),
             const SizedBox(height: AppSpacing.s),
-            DropdownButtonFormField<String>(
-              initialValue: _density,
-              decoration: const InputDecoration(labelText: 'Layout yoğunluğu', prefixIcon: Icon(Icons.tune)),
-              items: [for (final d in _densityOptions) DropdownMenuItem(value: d, child: Text(d))],
-              onChanged: (v) => setState(() => _density = v ?? _density),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Layout yoğunluğu (layout_version tarifinden)',
+                prefixIcon: Icon(Icons.tune),
+              ),
+              child: Text(_density),
             ),
             const SizedBox(height: AppSpacing.m),
             Row(

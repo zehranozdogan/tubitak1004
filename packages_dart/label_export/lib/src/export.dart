@@ -166,3 +166,25 @@ GeneratedLabel generateLabel(schema.LabelPayload payload, {String density = 'low
 
   return GeneratedLabel(payload: payload, qr: qr, layout: layout, layoutJson: layoutJson);
 }
+
+/// OKUYUCU tarafı için: bir etiketin layout'unu (reaktif hücre konumları,
+/// referans bölgeleri) `payload`'dan YENİDEN türetir — admin'in etiketi
+/// basarken kullandığı `generateLabel` + `renderLabelImage` ile AYNI adımlar
+/// (render, kalibrasyon yöntemi B/C ise `reference_regions`'a kenar
+/// yamalarının konumunu yazar; görüntü atılır, sadece bu yan etki gerekli).
+///
+/// Neden var: karar 0005 (statik/paketli veri) tek başına yetmiyor — QR
+/// boyutu payload uzunluğuna göre değiştiği için sabit bir layout dosyası
+/// gerçek etiketlerle uyuşmaz. Bunun yerine paketli veri sadece "tarif"
+/// (yoğunluk) tutar, hücreler `layout_version` seed'iyle her iki tarafta
+/// AYNI Dart algoritmasıyla türetilir (bkz. apps/freshqr README, 24 Eylül).
+GeneratedLabel resolveLabelLayout(
+  schema.LabelPayload payload, {
+  String density = 'low',
+  Map<String, dynamic>? sensorProfile,
+}) {
+  final generated = generateLabel(payload, density: density);
+  qr_layout.renderLabelImage(generated.qr, generated.layoutJson, sensorProfile, state: null);
+  final layout = schema.LayoutVersionData.fromJson(generated.layoutJson);
+  return GeneratedLabel(payload: payload, qr: generated.qr, layout: layout, layoutJson: generated.layoutJson);
+}

@@ -1,0 +1,4 @@
+{
+  "sensor_profiles": ["GENIPIN_PUTRESIN_v2", "DEMO_QR_STATE_COLORS_v1"],
+  "layout_versions": ["QR_SENSOR_v4"]
+}
