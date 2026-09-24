@@ -82,7 +82,7 @@ void main() {
     expect(find.text('Geçersiz QR kodu'), findsOneWidget);
   });
 
-  testWidgets('Yönetici -> yer tutucu ekran açılır (bir sonraki adım)', (tester) async {
+  testWidgets('Login -> Yönetici ekranı açılır', (tester) async {
     await tester.pumpWidget(const FreshQrApp());
     await tester.pumpAndSettle();
 

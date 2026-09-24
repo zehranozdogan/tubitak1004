@@ -22,8 +22,8 @@ biçimleri) — iki prototip görsel olarak tutarlı.
 |---|---|---|
 | Giriş | `login_view.py` | Tamamlandı |
 | Kullanıcı (tara/sonuç) | `user_view.py` | Tamamlandı — TÜM dallar (taze/geçiş/bozuk/düşük kalite/izin yok/geçersiz QR) mock `ColorEngineResult` ile |
-| Yönetici (etiket oluştur) | `admin_view.py` | Yer tutucu — SIRADAKİ ADIM |
-| Etiketler / Etiket detay | `labels_view.py` / `label_detail_view.py` | Henüz yok |
+| Yönetici (etiket oluştur) | `admin_view.py` | Tamamlandı (zehra) — form, canlı önizleme, gerçek export (yerel depolama) |
+| Etiketler / Etiket detay | `labels_view.py` / `label_detail_view.py` | Tamamlandı — liste, detay, silme (Yönetici AppBar ikonundan) |
 
 ## Mock veri neden GERÇEK tip kullanıyor
 
@@ -45,18 +45,14 @@ metinlerinin EKRANDA OLMADIĞI ayrıca test ediliyor.
 
 ## Doğrulama
 
-`flutter analyze` (0 uyarı), `flutter test` (6/6), `flutter build web` VE
+`flutter analyze` (0 uyarı), `flutter test` (12/12), `flutter build web` VE
 `flutter build apk --debug` gerçekten derlendi (bu repodaki diğer örneklerin
 aksine bu paket CAMERA/ML Kit KULLANMIYOR — sadece UI, bu yüzden bu app
 gerçekten `flutter run -d chrome` ile de sorunsuz çalışmalı).
 
 ## Sırada ne var
 
-1. Yönetici ekranı (form + `packages_dart/label_export` ile GERÇEK canlı
-   metadata önizleme — kamera gerektirmediği için hemen bağlanabilir; QR'ın
-   GÖRSEL kısmı zehra'nın `CustomPainter` portunu bekliyor).
-2. Etiketler / Etiket detay ekranları.
-3. Kamera + ML Kit entegrasyonu (kullanıcı ekranındaki "Tazelik Tara"
+1. Kamera + ML Kit entegrasyonu (kullanıcı ekranındaki "Tazelik Tara"
    butonu şu an mock; gerçek akış `apps/flutter_camera_spike`'ta ayrıca
    doğrulandı) — bağlanınca `_runScan` çağrıları mock yerine gerçek
    `analyzeFrame()` sonucu kullanacak.
