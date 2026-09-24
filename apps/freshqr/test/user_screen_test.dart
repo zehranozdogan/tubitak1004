@@ -3,7 +3,6 @@
 // aşamada gerçek kamera/analiz YOK (bkz. lib/screens/user/user_screen.dart
 // dosya başlığı) — sadece ekranların DOĞRU bağlandığını kanıtlar.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freshqr/main.dart';
 
