@@ -3,3 +3,4 @@
 library;
 
 export 'src/export.dart';
+export 'src/pdf_export.dart';

@@ -15,8 +15,8 @@
 // 24 Eylül: sensor_profile ve layout tarifi artık paketli asset'ten
 // (`data/reference_data.dart`, karar 0005) yükleniyor; yoğunluk kullanıcı
 // seçimi değil, layout_version tarifinden geliyor (okuyucu aynı tarifle
-// hücreleri yeniden türetiyor). PDF export yok (qr_layout/render.dart'ta bilerek kapsam dışı bırakıldı,
-// ayrı bir `pdf` paketi gerekiyor).
+// hücreleri yeniden türetiyor). PDF çıktısı label_export.exportLabel içinde (elle yazılmış,
+// bağımlılıksız PDF yazıcı — `pdf` paketi qr ^3 istediği için kullanılmadı).
 
 import 'dart:io';
 import 'dart:typed_data';

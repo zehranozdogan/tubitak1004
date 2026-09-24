@@ -35,6 +35,8 @@ import 'package:image/image.dart' as img;
 import 'package:profile_schema/profile_schema.dart' as schema;
 import 'package:qr_layout/qr_layout.dart' as qr_layout;
 
+import 'pdf_export.dart';
+
 /// Python `_payload_qr_text` — QR içine gömülecek KOMPAKT JSON metni.
 /// `jsonEncode` zaten boşluksuz/kompakt üretir (Python'un
 /// `separators=(",", ":")` ile AYNI biçim); alan sırası da `LabelPayload.
@@ -133,6 +135,7 @@ Future<ExportedLabel> exportLabel(
     'payload_json': File('${outDir.path}/$stem.label_payload.json'),
     'layout_json': File('${outDir.path}/$stem.layout_version.json'),
     'png': File('${outDir.path}/$stem.png'),
+    'pdf': File('${outDir.path}/$stem.pdf'),
     'state_fresh': File('${outDir.path}/$stem.state_fresh.png'),
     'state_transition': File('${outDir.path}/$stem.state_transition.png'),
     'state_spoiled': File('${outDir.path}/$stem.state_spoiled.png'),
@@ -142,6 +145,7 @@ Future<ExportedLabel> exportLabel(
   await paths['payload_json']!.writeAsString(encoder.convert(payload.toJson()));
   await paths['layout_json']!.writeAsString(encoder.convert(generated.layoutJson));
   await paths['png']!.writeAsBytes(img.encodePng(neutralImage));
+  await paths['pdf']!.writeAsBytes(labelPdfBytes(neutralImage));
   await paths['state_fresh']!.writeAsBytes(statePngs['fresh']!);
   await paths['state_transition']!.writeAsBytes(statePngs['transition']!);
   await paths['state_spoiled']!.writeAsBytes(statePngs['spoiled']!);
