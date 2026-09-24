@@ -93,10 +93,12 @@ class _ResultViewState extends State<ResultView> {
                   Icon(headlineIcon, size: 28, color: headlineColor),
                   const SizedBox(width: AppSpacing.s),
                 ],
-                Text(
-                  headlineText,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: AppTextSizes.title, fontWeight: FontWeight.bold, color: headlineColor),
+                Flexible(
+                  child: Text(
+                    headlineText,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: AppTextSizes.title, fontWeight: FontWeight.bold, color: headlineColor),
+                  ),
                 ),
               ],
             ),
