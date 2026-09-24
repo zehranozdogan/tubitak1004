@@ -16,6 +16,7 @@ import 'package:color_engine/color_engine.dart';
 import 'package:image/image.dart' as img;
 import 'package:label_export/label_export.dart' as label_export;
 import 'package:profile_schema/profile_schema.dart' as schema;
+import 'package:qr_layout/qr_layout.dart' as qr_layout;
 
 import '../data/reference_data.dart';
 import '../screens/user/mock_results.dart' show LabelInfo;
@@ -88,11 +89,22 @@ Future<ScanOutcome> analyzeCapturedLabel({
   }
 
   final resolved = label_export.resolveLabelLayout(payload, density: recipe.moduleDensity, sensorProfile: loaded.raw);
+  // Her sensör hücresinin basılırken kullandığı bit (1 koyu, 0 açık ton) —
+  // okuyucu QR matrisini zaten yeniden ürettiği için biliniyor. Kasıtlı hata
+  // (intentional_errors) hücreleri gerçek bitin TERSİYLE basılır.
+  final matrix = qr_layout.moduleMatrix(resolved.qr);
+  final flipped = {for (final c in resolved.layout.intentionalErrors) c};
+  final bits = [
+    for (final c in resolved.layout.sensorModules)
+      flipped.contains(c) ? 1 - matrix[c.$1][c.$2] : matrix[c.$1][c.$2],
+  ];
+
   final result = analyzeFrame(
     image,
     sensorProfile: loaded.profile,
     layoutVersion: resolved.layout,
     qrCorners: corners,
+    sensorModuleBits: bits,
   );
 
   return ScanSuccess(

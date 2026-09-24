@@ -83,4 +83,24 @@ void main() {
     final text = jsonEncode({...label.payload.toJson(), 'sensor_profile_id': '../../pubspec'});
     expect(await _scan('fresh', qrTextOverride: text), isA<ScanInvalidQr>());
   });
+
+  test('GENIPIN: 12 farklı etikette (farklı açık/koyu dağılımı) 3 durumun seviyesi sabit, güven ~1.0 (sınıf-farkındalıklı okuma)', () async {
+    final ref = ReferenceData(_fileReader);
+    final profile = await ref.sensorProfile('GENIPIN_PUTRESIN_v2');
+    final expected = {'fresh': 0.0625, 'transition': 0.25, 'spoiled': 1.0};
+    for (var n = 45678; n < 45690; n++) {
+      final label = _label(profileId: 'GENIPIN_PUTRESIN_v2', productId: 'TR$n');
+      for (final state in expected.keys) {
+        final image = qr_layout.renderLabelImage(label.qr, label.layoutJson, profile.raw, state: state);
+        final outcome = await analyzeCapturedLabel(
+          qrText: label_export.labelPayloadQrText(label.payload),
+          image: rgbImageFromImage(image),
+          corners: canonicalQrCorners(label.layout.matrixSize),
+          reference: ref,
+        ) as ScanSuccess;
+        expect(outcome.result.matchedProfilePoint, expected[state], reason: 'TR$n $state');
+        expect(outcome.result.confidence!, greaterThan(0.99), reason: 'TR$n $state');
+      }
+    }
+  });
 }

@@ -31,6 +31,15 @@
 //    kalanı ise İSİMLİ kayıt (`({int row, int col})`) kullanıyor
 //    (qr_layout ile tutarlı olsun diye); aradaki dönüşüm
 //    `_toNamedCell`'de tek bir yerde yapılıyor.
+//
+// 5. SINIF-FARKINDALIKLI okuma (24 Eylül, Python pipeline.py'de YOK):
+//    `sensorModuleBits` verilirse temsilci renk/eşleştirme/ΔE/güven açık ve
+//    koyu hücre sınıfları AYRI değerlendirilir. Sebep: hücreler QR okunabilsin
+//    diye kendi açık/koyu tonunu korur (§5.2); tüm hücreleri tek medyanda
+//    karıştırmak (a) güveni yapay düşürüyordu (geçişte açık-koyu ΔE 14.8 iken
+//    taze/bozukta ~8) ve (b) teknik seviyeyi çoğunluk sınıfına bağlıyordu.
+//    Eşleştirme için çoğunluktan bağımsız KOYU sınıf (yoksa açık) kullanılır.
+//    `sensorModuleBits` null ise eski (Python'la aynı) davranış korunur.
 
 import 'dart:math' as math;
 
@@ -101,16 +110,19 @@ double _referenceCornerConsistency(RgbImage canonical, int matrixSize) {
   return math.sqrt(variance) / mean;
 }
 
+double _spreadToConfidence(double meanSpread) {
+  final span = _spreadSaturatingDeltaE - _spreadFloorDeltaE;
+  final value = 1.0 - (meanSpread - _spreadFloorDeltaE) / span;
+  return value < 0.0 ? 0.0 : (value > 1.0 ? 1.0 : value);
+}
+
 double _moduleReadingConfidence(List<ModuleReading> moduleReadings, Lab representativeLab) {
   if (moduleReadings.isEmpty) return 0.0;
   var sum = 0.0;
   for (final m in moduleReadings) {
     sum += deltaE(m.lab, representativeLab);
   }
-  final meanSpread = sum / moduleReadings.length;
-  final span = _spreadSaturatingDeltaE - _spreadFloorDeltaE;
-  final value = 1.0 - (meanSpread - _spreadFloorDeltaE) / span;
-  return value < 0.0 ? 0.0 : (value > 1.0 ? 1.0 : value);
+  return _spreadToConfidence(sum / moduleReadings.length);
 }
 
 ColorEngineResult _rescanResult(double quality, String note) {
@@ -120,11 +132,16 @@ ColorEngineResult _rescanResult(double quality, String note) {
 /// Tek bir kareden tazelik/teknik sonucu üretir (rapor §6.2 adım 1-8, adım
 /// 1 -QR tespiti- hariç — bkz. dosya başlığı sapma #1: `qrCorners` zaten
 /// bulunmuş olarak verilir).
+/// `sensorModuleBits` (opsiyonel): `layoutVersion.sensorModules` ile AYNI sırada,
+/// her sensör hücresinin basılırken kullandığı QR biti (1 = koyu ton, 0 = açık
+/// ton). Verilirse temsilci renk, eşleştirme, ΔE ve güven SINIF-FARKINDALIKLI
+/// hesaplanır (bkz. dosya başlığı sapma #5); verilmezse (null) eski davranış.
 ColorEngineResult analyzeFrame(
   RgbImage image, {
   required schema.SensorProfile sensorProfile,
   required schema.LayoutVersionData layoutVersion,
   required List<List<double>> qrCorners,
+  List<int>? sensorModuleBits,
 }) {
   // profile_schema'nın (tam, doğrulanmış) tiplerinden bu fonksiyonun
   // ihtiyaç duyduğu değerleri türet (bkz. dosya başlığı sapma #4).
@@ -243,8 +260,6 @@ ColorEngineResult analyzeFrame(
     moduleReadings.add(ModuleReading(module: (row, col), normalizedColor: rgb, lab: lab));
   }
 
-  // 6. Temsilci renk: modüller arası median (RGB, HER KANAL BAĞIMSIZ — bkz.
-  //    roi.dart::robustModuleColor notu, np.median(axis=0) ile aynı) + Lab.
   double medianOf(Iterable<double> values) {
     final sorted = values.toList()..sort();
     final n = sorted.length;
@@ -252,11 +267,61 @@ ColorEngineResult analyzeFrame(
     return (sorted[n ~/ 2 - 1] + sorted[n ~/ 2]) / 2.0;
   }
 
-  final representativeRgb = Rgb(
-    medianOf(rgbSamples.map((p) => p.r)),
-    medianOf(rgbSamples.map((p) => p.g)),
-    medianOf(rgbSamples.map((p) => p.b)),
-  );
+  Rgb medianRgb(List<Rgb> samples) => Rgb(
+        medianOf(samples.map((p) => p.r)),
+        medianOf(samples.map((p) => p.g)),
+        medianOf(samples.map((p) => p.b)),
+      );
+
+  final bits = sensorModuleBits;
+  if (bits != null && bits.length != sensorModulesCells.length) {
+    throw ArgumentError(
+      'sensorModuleBits uzunluğu (${bits.length}) sensor_modules ile (${sensorModulesCells.length}) aynı olmalı.',
+    );
+  }
+
+  // 6. Temsilci renk. HER KANAL BAĞIMSIZ medyan (np.median(axis=0) ile aynı).
+  //    `sensorModuleBits` VARSA: hücreler basılırken kendi açık/koyu sınıfını
+  //    korur (QR okunabilsin diye, §5.2) — iki sınıfın tonları farklı olduğu
+  //    için hepsini TEK medyanda karıştırmak sonucu çoğunluk sınıfına bağlı
+  //    kılar. Bu yüzden her sınıf KENDİ medyanına bakar; eşleştirme için
+  //    çoğunluktan bağımsız, deterministik bir sınıf seçilir: KOYU (varsa),
+  //    yoksa açık.
+  final Rgb representativeRgb;
+  final double confidence;
+  if (bits == null) {
+    representativeRgb = medianRgb(rgbSamples);
+    confidence = _moduleReadingConfidence(moduleReadings, rgbToLab(representativeRgb));
+  } else {
+    final darkIdx = [for (var i = 0; i < bits.length; i++) if (bits[i] != 0) i];
+    final lightIdx = [for (var i = 0; i < bits.length; i++) if (bits[i] == 0) i];
+    final groups = [darkIdx, lightIdx].where((g) => g.isNotEmpty).toList();
+    final groupReps = [for (final g in groups) medianRgb([for (final i in g) rgbSamples[i]])];
+    representativeRgb = groupReps.first; // groups[0] = koyu (boş değilse), yoksa açık
+
+    var spreadSum = 0.0;
+    for (var gi = 0; gi < groups.length; gi++) {
+      final repLab = rgbToLab(groupReps[gi]);
+      for (final i in groups[gi]) {
+        spreadSum += deltaE(moduleReadings[i].lab, repLab);
+      }
+    }
+    confidence = _spreadToConfidence(spreadSum / moduleReadings.length);
+
+    if (groups.length == 2) {
+      int indexOf(Lab lab) => scalePoints.indexOf(scalePoints.firstWhere(
+            (p) => p.value == matchProfilePoint(lab, scalePoints: scalePoints, hasClassThresholds: false).matchedProfilePoint,
+          ));
+      final darkIndex = indexOf(rgbToLab(groupReps[0]));
+      final lightIndex = indexOf(rgbToLab(groupReps[1]));
+      if ((darkIndex - lightIndex).abs() > 1) {
+        notes.add(
+          'Koyu ve açık hücre sınıfları birbirinden uzak profil noktalarına eşleşti '
+          '(P${darkIndex + 1} / P${lightIndex + 1}); ölçüm tutarsız olabilir.',
+        );
+      }
+    }
+  }
   final representativeLab = rgbToLab(representativeRgb);
 
   // 7. sensor_profile.scale_points ile eşleştirme (§7.2 sınıf kuralı dahil).
@@ -275,7 +340,7 @@ ColorEngineResult analyzeFrame(
     matchedProfilePoint: match.matchedProfilePoint,
     freshnessClass: match.freshnessClass,
     technicalLevel: match.technicalLevel,
-    confidence: _moduleReadingConfidence(moduleReadings, representativeLab),
+    confidence: confidence,
     moduleReadings: moduleReadings,
     notes: notes,
   );

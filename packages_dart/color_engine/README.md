@@ -90,3 +90,15 @@ mobil) çalışır.
   uca test EDİLDİ (23 Eylül — 6 referans noktası, `calibration_test.dart`'taki
   gerçek numpy.linalg.lstsq ile doğrulanmış sabitlerin AYNISI kullanılarak);
   74/74 test geçiyor.
+
+## Sınıf-farkındalıklı okuma (24 Eylül, Python'da YOK)
+
+`analyzeFrame(..., sensorModuleBits: ...)` — her sensör hücresinin basılırken
+kullandığı bit (1 koyu, 0 açık ton). Verilirse temsilci renk, eşleştirme, ΔE
+ve güven açık/koyu sınıflarına AYRI bakar. Sebep: hücreler QR okunabilsin
+diye kendi tonunu korur; hepsini tek medyanda karıştırmak güveni yapay
+düşürüyordu (geçişte açık-koyu ΔE 14.8, taze/bozukta ~8) ve teknik seviyeyi
+çoğunluk sınıfına bağlıyordu. Eşleştirme çoğunluktan bağımsız KOYU sınıfla
+(yoksa açık) yapılır; iki sınıf uzak noktalara eşleşirse not düşülür.
+`null` verilirse eski davranış. Testler: `test/class_aware_test.dart`.
+Gerçek fotoğrafla güven tabanı (ΔE 4) yeniden gözden geçirilmeli.
