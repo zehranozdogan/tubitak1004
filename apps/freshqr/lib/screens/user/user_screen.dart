@@ -20,12 +20,13 @@ import '../../services/file_scan.dart';
 import '../../services/scan_service.dart';
 import '../../widgets/app_screen.dart';
 import 'mock_results.dart';
+import 'widgets/camera_scanner.dart';
 import 'widgets/invalid_qr_view.dart';
 import 'widgets/permission_denied_view.dart';
 import 'widgets/result_view.dart';
 import 'widgets/scan_view.dart';
 
-enum _ViewState { scan, result, permissionDenied, invalidQr }
+enum _ViewState { scan, camera, result, permissionDenied, invalidQr }
 
 class UserScreen extends StatefulWidget {
   /// Test için enjekte edilebilir; null ise uygulama belge dizini/labels ve rootBundle.
@@ -82,6 +83,32 @@ class _UserScreenState extends State<UserScreen> {
 
   void _showScan() => setState(() => _view = _ViewState.scan);
 
+  /// "Tazelik Tara": Android/iOS'ta gerçek kamera; diğer platformlarda
+  /// (web/masaüstü — ML Kit yok) eskisi gibi mock sonuç.
+  void _startScan() {
+    if (cameraScanSupported) {
+      setState(() => _view = _ViewState.camera);
+    } else {
+      _runScan(mockOk);
+    }
+  }
+
+  Future<void> _onCapture(CameraCapture capture) async {
+    final outcome = await analyzeCapturedLabel(
+      qrText: capture.qrText,
+      image: capture.image,
+      corners: capture.corners,
+      reference: _reference,
+    );
+    if (!mounted) return;
+    switch (outcome) {
+      case ScanSuccess(:final result, :final labelInfo):
+        _runScan(result, labelInfo);
+      case ScanInvalidQr():
+        _showInvalidQr();
+    }
+  }
+
   void _runScan(ColorEngineResult result, [LabelInfo labelInfo = mockLabelInfo]) {
     setState(() {
       _result = result;
@@ -107,10 +134,22 @@ class _UserScreenState extends State<UserScreen> {
 
     final Widget body = switch (_view) {
       _ViewState.scan => ScanView(
-        onScan: () => _runScan(mockOk),
+        onScan: _startScan,
         testScenarios: testScenarios,
         storedLabels: _storedLabels,
         onFileScan: _fileScan,
+      ),
+      _ViewState.camera => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CameraScanner(
+            onCapture: _onCapture,
+            onPermissionDenied: _showPermissionDenied,
+            onError: (_) => _showInvalidQr(),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton(onPressed: _showScan, child: const Text('Vazgeç')),
+        ],
       ),
       _ViewState.result => ResultView(result: _result!, labelInfo: _labelInfo!, onRescan: _showScan),
       _ViewState.permissionDenied => PermissionDeniedView(onRetry: _showScan),

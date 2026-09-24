@@ -62,7 +62,7 @@ class ScanView extends StatelessWidget {
           title: 'Test senaryoları (geliştirme)',
           children: [
             Text(
-              'Gerçek kamera/QR henüz bağlı değil — sonuç ekranlarını önizlemek için.',
+              'Sonuç ekranlarını önizlemek için (gerçek kamera yalnızca Android/iOS cihazda çalışır).',
               style: TextStyle(fontSize: AppTextSizes.caption, color: scheme.onSurfaceVariant),
             ),
             Wrap(

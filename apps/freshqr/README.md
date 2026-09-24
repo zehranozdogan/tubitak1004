@@ -45,17 +45,26 @@ metinlerinin EKRANDA OLMADIĞI ayrıca test ediliyor.
 
 ## Doğrulama
 
-`flutter analyze` (0 uyarı), `flutter test` (12/12), `flutter build web` VE
+`flutter analyze` (0 uyarı), `flutter test` (35/35), `flutter build web` VE
 `flutter build apk --debug` gerçekten derlendi (bu repodaki diğer örneklerin
 aksine bu paket CAMERA/ML Kit KULLANMIYOR — sadece UI, bu yüzden bu app
 gerçekten `flutter run -d chrome` ile de sorunsuz çalışmalı).
 
-## Sırada ne var
+## Kamera testi (gerçek cihaz — HENÜZ YAPILMADI)
 
-1. Kamera + ML Kit entegrasyonu (kullanıcı ekranındaki "Tazelik Tara"
-   butonu şu an mock; gerçek akış `apps/flutter_camera_spike`'ta ayrıca
-   doğrulandı) — bağlanınca `_runScan` çağrıları mock yerine gerçek
-   `analyzeFrame()` sonucu kullanacak.
+`lib/screens/user/widgets/camera_scanner.dart` (camera + ML Kit, yalnızca
+Android/iOS) yazıldı ve APK olarak DERLENİYOR; gerçek bir telefonda
+denenmedi (USB kablosu yok). Saf parçalar test edildi (`frame_convert`:
+NV21/BGRA -> RGB + döndürme). Cihazda doğrulanması gerekenler:
+
+- ML Kit köşe noktalarının koordinat sistemi: kodda "döndürülmüş (dik)
+  görüntü" varsayıldı ve kare buna göre döndürülüyor. Yanlışsa sonuç
+  garip çıkar (köşe/kare uyumsuzluğu).
+- Köşe sırası (sol-üst, sağ-üst, sağ-alt, sol-alt) `analyzeFrame` ile uyumlu mu.
+- `ResolutionPreset.high` renk okuması için yeterli mi, kare dönüşümü hızı.
+- Etiketin bu app'te üretilmiş olması gerek (paketli profil/tarif, karar 24 Eylül).
+
+Başka platformlarda (web, Windows) "Tazelik Tara" mock sonuç gösterir.
 
 ## Çalıştırma
 
