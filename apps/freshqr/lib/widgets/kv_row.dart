@@ -17,7 +17,14 @@ class KvRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: TextStyle(color: muted, fontSize: AppTextSizes.body)),
-        Text(value, style: const TextStyle(fontSize: AppTextSizes.body, fontWeight: FontWeight.w500)),
+        const SizedBox(width: AppSpacing.s),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontSize: AppTextSizes.body, fontWeight: FontWeight.w500),
+          ),
+        ),
       ],
     );
   }

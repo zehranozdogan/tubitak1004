@@ -33,6 +33,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_screen.dart';
 import '../../widgets/kv_row.dart';
 import '../../widgets/section_card.dart';
+import '../labels/labels_screen.dart';
 
 const List<String> _commonSpecies = ['LEVREK', 'ÇİPURA', 'SOMON', 'ALABALIK'];
 
@@ -304,6 +305,13 @@ class _AdminScreenState extends State<AdminScreen> {
     return AppScreen(
       title: 'Yönetici — Etiket Oluşturma',
       onBack: () => Navigator.of(context).pop(),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.inventory_2_outlined),
+          tooltip: 'Üretilen etiketler',
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LabelsScreen())),
+        ),
+      ],
       children: [
         SectionCard(
           title: 'Etiket bilgisi',
