@@ -22,6 +22,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 import 'package:image/image.dart' as img;
 import 'package:label_export/label_export.dart' as label_export;
 import 'package:path_provider/path_provider.dart';
@@ -348,6 +349,31 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
+  /// PNG'yi (nötr etiket görseli) telefonun kendi Galeri/Fotoğraflar
+  /// uygulamasına kaydeder — PDF'in aksine (o "Dosyalar"a gider, paylaşım
+  /// üzerinden yapılabiliyor) bu, resim/video için ayrı bir sistem
+  /// (MediaStore) kullanıyor, `gal` paketi bunu sarmalıyor.
+  Future<void> _saveToGallery() async {
+    final path = _outputFiles['png'];
+    if (path == null) return;
+    try {
+      await Gal.putImage(path, album: 'FreshQR');
+      if (mounted) {
+        setState(() {
+          _statusText = 'Görsel galeriye kaydedildi.';
+          _statusIsError = false;
+        });
+      }
+    } catch (ex) {
+      if (mounted) {
+        setState(() {
+          _statusText = 'Galeriye kaydedilemedi: $ex';
+          _statusIsError = true;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
@@ -530,12 +556,29 @@ class _AdminScreenState extends State<AdminScreen> {
                   ],
                 ),
               ],
-              if (_outputFiles.containsKey('pdf')) ...[
+              if (_outputFiles.containsKey('pdf') || _outputFiles.containsKey('png')) ...[
                 const SizedBox(height: AppSpacing.m),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.ios_share),
-                  label: const Text('Etiketi paylaş / yazdır (PDF)'),
-                  onPressed: _sharePdf,
+                Row(
+                  children: [
+                    if (_outputFiles.containsKey('pdf'))
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.ios_share),
+                          label: const Text('Paylaş / Yazdır'),
+                          onPressed: _sharePdf,
+                        ),
+                      ),
+                    if (_outputFiles.containsKey('pdf') && _outputFiles.containsKey('png'))
+                      const SizedBox(width: AppSpacing.s),
+                    if (_outputFiles.containsKey('png'))
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.image_outlined),
+                          label: const Text('Galeriye kaydet'),
+                          onPressed: _saveToGallery,
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ],
