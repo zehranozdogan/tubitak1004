@@ -98,6 +98,7 @@ class _UserScreenState extends State<UserScreen> {
       qrText: capture.qrText,
       image: capture.image,
       corners: capture.corners,
+      finderPoints: capture.finderPoints,
       reference: _reference,
     );
     if (!mounted) return;

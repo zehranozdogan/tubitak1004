@@ -1,11 +1,17 @@
-// Canlı kamera önizlemesi + ML Kit ile QR tespiti. Bir QR bulunca kareyi dik
-// (rotation uygulanmış) RGB'ye çevirip metin + köşelerle birlikte verir;
-// analiz zinciri (services/scan_service.dart) bunun dışında, saf Dart.
+// Canlı kamera önizlemesi + İKİ decoder: ML Kit (birincil, hızlı/donanım
+// hızlandırmalı) ve saf-Dart zxing2 (yedek — rapor §11: "en az iki decoder").
+// ML Kit ardışık `_fallbackAfterFailures` karede QR bulamazsa, AYNI karede
+// ayrıca zxing2 denenir (bkz. qr_layout/decode.dart). ML Kit'in başarısız
+// olduğu HER karede zxing2'yi de çalıştırmak yerine (renkli QR'ın RGB'ye
+// çevrilmesi + tam decode denemesi ucuz değil) sadece "ML Kit zorlanıyor"
+// sinyali alınca devreye giriyor — mutlu yolda (ML Kit hemen buluyorsa)
+// hiç ekstra maliyet yok.
 //
 // SADECE Android/iOS: ML Kit başka platformu desteklemiyor (bkz.
-// `cameraScanSupported`). Bu dosya gerçek cihazda henüz DENENMEDİ — saf
-// parçalar (frame_convert) test edildi, kamera/ML Kit kısmı derleniyor ama
-// cihaz doğrulaması bekliyor (README "kamera testi").
+// `cameraScanSupported`) — zxing2 platform bağımsız ama kamera erişimi
+// zaten bu ikisine özel. Bu dosya gerçek cihazda henüz DENENMEDİ — saf
+// parçalar (frame_convert, qr_layout/decode.dart) test edildi, kamera/ML
+// Kit kısmı derleniyor ama cihaz doğrulaması bekliyor (README "kamera testi").
 
 import 'dart:typed_data';
 
@@ -15,6 +21,7 @@ import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatf
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:qr_layout/qr_layout.dart' show QrFinderPoints, decodeQrZxing;
 
 import '../../../services/frame_convert.dart';
 import '../../../theme/app_theme.dart';
@@ -25,9 +32,14 @@ bool get cameraScanSupported =>
 class CameraCapture {
   final String qrText;
   final RgbImage image;
-  final List<List<double>> corners; // sol-üst, sağ-üst, sağ-alt, sol-alt (dik görüntüde)
+  // Tam olarak biri dolu: ML Kit yolunda `corners` (4 gerçek köşe), zxing2
+  // yedek yolunda `finderPoints` (sadece finder merkezleri — gerçek köşe
+  // `analyzeCapturedLabel` içinde, matrixSize bilinince kestirilir).
+  final List<List<double>>? corners;
+  final QrFinderPoints? finderPoints;
 
-  const CameraCapture({required this.qrText, required this.image, required this.corners});
+  const CameraCapture({required this.qrText, required this.image, this.corners, this.finderPoints})
+      : assert((corners == null) != (finderPoints == null), 'corners ile finderPoints\'ten tam olarak biri verilmeli');
 }
 
 class CameraScanner extends StatefulWidget {
@@ -44,10 +56,14 @@ class CameraScanner extends StatefulWidget {
 class _CameraScannerState extends State<CameraScanner> {
   // Her karede ML Kit çağırmak yerine her N karede bir (gereksiz CPU/pil).
   static const int _detectEveryNFrames = 3;
+  // ML Kit bu kadar ardışık ÖRNEKLENEN karede QR bulamazsa (yaklaşık
+  // 15*3/30fps ≈ 1.5sn), zxing2 de denenmeye başlanır (bkz. dosya başlığı).
+  static const int _fallbackAfterFailures = 15;
 
   final BarcodeScanner _scanner = BarcodeScanner(formats: [BarcodeFormat.qrCode]);
   CameraController? _controller;
   int _frameCounter = 0;
+  int _mlKitFailureStreak = 0;
   bool _busy = false;
   bool _done = false;
 
@@ -113,30 +129,23 @@ class _CameraScannerState extends State<CameraScanner> {
         final points = barcode.cornerPoints;
         if (barcode.format != BarcodeFormat.qrCode || text == null || points.length != 4) continue;
 
-        _done = true;
-        await controller.stopImageStream();
-        final rgb = defaultTargetPlatform == TargetPlatform.android
-            ? nv21ToRgbImage(
-                _concatenatePlanes(image.planes),
-                image.width,
-                image.height,
-                bytesPerRow: image.planes.first.bytesPerRow,
-                rotation: rotation,
-              )
-            : bgraToRgbImage(
-                image.planes.first.bytes,
-                image.width,
-                image.height,
-                bytesPerRow: image.planes.first.bytesPerRow,
-                rotation: rotation,
-              );
-        if (!mounted) return;
-        widget.onCapture(CameraCapture(
+        await _finish(
+          controller,
           qrText: text,
-          image: rgb,
+          rgb: _frameToRgb(image, rotation),
           corners: [for (final p in points) [p.x.toDouble(), p.y.toDouble()]],
-        ));
+        );
         return;
+      }
+
+      // ML Kit bu karede bulamadı — yedek decoder devreye girene kadar sayacı ilerlet.
+      _mlKitFailureStreak++;
+      if (_mlKitFailureStreak < _fallbackAfterFailures) return;
+
+      final rgbForZxing = _frameToRgb(image, rotation);
+      final zx = decodeQrZxing(rgbToImgImage(rgbForZxing));
+      if (zx != null && zx.finderPoints != null) {
+        await _finish(controller, qrText: zx.text, rgb: rgbForZxing, finderPoints: zx.finderPoints);
       }
     } catch (e) {
       if (!_done && mounted) {
@@ -146,6 +155,37 @@ class _CameraScannerState extends State<CameraScanner> {
     } finally {
       _busy = false;
     }
+  }
+
+  RgbImage _frameToRgb(CameraImage image, int rotation) {
+    return defaultTargetPlatform == TargetPlatform.android
+        ? nv21ToRgbImage(
+            _concatenatePlanes(image.planes),
+            image.width,
+            image.height,
+            bytesPerRow: image.planes.first.bytesPerRow,
+            rotation: rotation,
+          )
+        : bgraToRgbImage(
+            image.planes.first.bytes,
+            image.width,
+            image.height,
+            bytesPerRow: image.planes.first.bytesPerRow,
+            rotation: rotation,
+          );
+  }
+
+  Future<void> _finish(
+    CameraController controller, {
+    required String qrText,
+    required RgbImage rgb,
+    List<List<double>>? corners,
+    QrFinderPoints? finderPoints,
+  }) async {
+    _done = true;
+    await controller.stopImageStream();
+    if (!mounted) return;
+    widget.onCapture(CameraCapture(qrText: qrText, image: rgb, corners: corners, finderPoints: finderPoints));
   }
 
   @override

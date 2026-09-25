@@ -9,3 +9,4 @@ export 'src/crc32.dart';
 export 'src/reactive.dart';
 export 'src/generator.dart';
 export 'src/render.dart';
+export 'src/decode.dart';

@@ -50,13 +50,22 @@ Modules`, `selectIntentionalErrors`) YAPISAL özellikleriyle doğruluyor
 Deterministik/rastgelesiz kısımlar (chebyshev, boundary distance, function
 distance transform, safety score, crc32) ise gerçek Python ile BİREBİR.
 
-## Sırada ne var
+- `decode.py` -> `lib/src/decode.dart` — GERÇEK QR çözme, `zxing2` paketiyle
+  (25 Eylül, saf Dart ZXing portu — yerel derleme GEREKTİRMEZ, `flutter_zxing`
+  gibi C++/CMake bağımlılığı yok). `apps/freshqr`'da ML Kit'in (birincil,
+  Android/iOS'a özel) YEDEĞİ olarak kullanılıyor (rapor §11: "en az iki
+  decoder"). `decodeQrZxing` + `estimateOuterCorners` (finder pattern
+  merkezlerinden gerçek dış köşe kestirimi — DOĞRULAMA ve SINIRLAR için
+  dosyanın kendi başlığına bkz., eksen-hizalı sentetik testte TAM eşleşiyor,
+  gerçek kamera perspektifinde henüz doğrulanmadı). 24 etikette (3
+  durum × 8 parti no) temiz görüntüde 36/36 çözüldü.
 
-- `render.py` (SVG/PNG rasterize) — Flutter'da `CustomPainter` ile yeniden
-  yazılacak (zehra bunu yapıyor), doğrudan port değil.
-- `label_export/export.py` orkestrasyonu render-ÖNCESİ kısmıyla port edildi
-  (23 Eylül, `packages_dart/label_export`) — render entegre olunca (zehra)
-  kalibrasyon-özel referans yaması ekleme adımı da eklenecek.
+`render.py` (SVG/PNG rasterize) Flutter'da `CustomPainter` yerine doğrudan
+piksel üreten `render.dart`'a taşındı (zehra, 23-24 Eylül) —
+`renderColoredImage`/`renderLabelImage`/`syntheticStatesPngBytes`.
+
+`label_export/export.py` orkestrasyonu render DAHİL tam port edildi
+(`packages_dart/label_export::exportLabel`/`resolveLabelLayout`).
 
 `packages_dart/color_engine` artık bu pakete BAĞIMLI (23 Eylül'de
 temizlendi — önceden `finder_pattern.dart` diye kısmi bir kopyası vardı,

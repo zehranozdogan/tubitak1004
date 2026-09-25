@@ -64,12 +64,23 @@ String _titleCase(String s) {
   return lower[0].toUpperCase() + lower.substring(1);
 }
 
+/// `corners` (ML Kit yolu: köşeler doğrudan biliniyor) VEYA `finderPoints`
+/// (saf-Dart yedek decoder yolu, `qr_layout.decodeQrZxing`: sadece finder
+/// pattern merkezleri biliniyor, GERÇEK köşeler `matrixSize` bilinmeden
+/// hesaplanamaz — bkz. qr_layout/decode.dart dosya başlığı) verilmeli,
+/// İKİSİ BİRDEN DEĞİL. `matrixSize`, payload çözüldükten SONRA (layout
+/// yeniden türetilince) belli olur; `finderPoints` yolunda köşe kestirimi
+/// bu yüzden burada, `resolved.layout.matrixSize` elde edildikten sonra yapılır.
 Future<ScanOutcome> analyzeCapturedLabel({
   required String qrText,
   required RgbImage image,
-  required List<List<double>> corners,
+  List<List<double>>? corners,
+  qr_layout.QrFinderPoints? finderPoints,
   required ReferenceData reference,
 }) async {
+  if ((corners == null) == (finderPoints == null)) {
+    throw ArgumentError('corners ile finderPoints\'ten TAM OLARAK biri verilmeli.');
+  }
   final schema.LabelPayload payload;
   try {
     final decoded = jsonDecode(qrText);
@@ -99,11 +110,13 @@ Future<ScanOutcome> analyzeCapturedLabel({
       flipped.contains(c) ? 1 - matrix[c.$1][c.$2] : matrix[c.$1][c.$2],
   ];
 
+  final resolvedCorners = corners ?? qr_layout.estimateOuterCorners(finderPoints!, resolved.layout.matrixSize);
+
   final result = analyzeFrame(
     image,
     sensorProfile: loaded.profile,
     layoutVersion: resolved.layout,
-    qrCorners: corners,
+    qrCorners: resolvedCorners,
     sensorModuleBits: bits,
   );
 
