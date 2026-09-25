@@ -27,6 +27,7 @@ import 'package:label_export/label_export.dart' as label_export;
 import 'package:path_provider/path_provider.dart';
 import 'package:profile_schema/profile_schema.dart' as schema;
 import 'package:qr_layout/qr_layout.dart' as qr_layout;
+import 'package:share_plus/share_plus.dart';
 
 import '../../theme/app_theme.dart';
 import '../../widgets/app_screen.dart';
@@ -78,7 +79,7 @@ class _AdminScreenState extends State<AdminScreen> {
   bool _statusIsError = false;
   List<(String, String)> _meta = [];
   List<(String, Uint8List)> _statePreviews = [];
-  List<String> _outputFilePaths = [];
+  Map<String, String> _outputFiles = {};
   bool _exporting = false;
 
   Directory? _labelsDir;
@@ -262,7 +263,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ('Kalibrasyon', calibrationCode),
         ];
         _statePreviews = [];
-        _outputFilePaths = [];
+        _outputFiles = {};
         _statusText = "Gri noktalar = reaktif sensör hücreleri. 'Etiketi oluştur' ile dosyaları üret.";
         _statusIsError = false;
       });
@@ -274,7 +275,7 @@ class _AdminScreenState extends State<AdminScreen> {
         _previewPngBytes = null;
         _meta = [];
         _statePreviews = [];
-        _outputFilePaths = [];
+        _outputFiles = {};
       });
     }
   }
@@ -320,7 +321,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ('Kalibrasyon', calibrationCode),
         ];
         _statePreviews = statePreviews;
-        _outputFilePaths = [for (final f in result.paths.values) f.path];
+        _outputFiles = {for (final e in result.paths.entries) e.key: e.value.path};
         _statusText = "Dosyalar '${dir.path}' altına yazıldı.";
         _statusIsError = false;
       });
@@ -334,6 +335,17 @@ class _AdminScreenState extends State<AdminScreen> {
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
+  }
+
+  /// Rapor §8: "Basılabilir etiket PNG/PDF" — asıl fiziksel çıktı bu.
+  /// Ham dosya yolu göstermek yerine (kullanıcı için anlamsız), yerel
+  /// paylaşım/yazdırma sayfasını açar (AirDrop, e-posta, doğrudan yazıcı...).
+  Future<void> _sharePdf() async {
+    final path = _outputFiles['pdf'];
+    if (path == null) return;
+    await SharePlus.instance.share(
+      ShareParams(files: [XFile(path)], text: 'FreshQR etiketi — ${_productIdController.text}'),
+    );
   }
 
   @override
@@ -518,15 +530,13 @@ class _AdminScreenState extends State<AdminScreen> {
                   ],
                 ),
               ],
-              if (_outputFilePaths.isNotEmpty) ...[
+              if (_outputFiles.containsKey('pdf')) ...[
                 const SizedBox(height: AppSpacing.m),
-                Text(
-                  'Çıktı dosyaları',
-                  style: TextStyle(color: muted, fontSize: AppTextSizes.caption, fontWeight: FontWeight.w600),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.ios_share),
+                  label: const Text('Etiketi paylaş / yazdır (PDF)'),
+                  onPressed: _sharePdf,
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                for (final path in _outputFilePaths)
-                  Text(path, style: TextStyle(color: muted, fontSize: AppTextSizes.caption)),
               ],
             ],
           ),
