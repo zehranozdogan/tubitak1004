@@ -1,9 +1,15 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <!-- gal paketi (Galeriye kaydet, admin_screen.dart): API<=29'da galeri
-         yazımı için gerekli — API 30+'ta MediaStore izin gerektirmeden çalışır. -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+         yazımı için gerekli — API 30+'ta MediaStore izin gerektirmeden çalışır.
+         camera_android_camerax AYNI izni maxSdkVersion=28 ile bildiriyor —
+         manifest birleştirme çakışmasını tools:replace ile çözüyoruz (bizim
+         29 değeri, gal'ın istediğiyle uyumlu, kazanıyor). -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29"
+        tools:replace="android:maxSdkVersion" />
     <application
         android:label="freshqr"
         android:name="${applicationName}"
