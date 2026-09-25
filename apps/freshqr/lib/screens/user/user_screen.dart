@@ -53,6 +53,7 @@ class _UserScreenState extends State<UserScreen> {
   Directory? _dir;
   File? _historyFile;
   bool _isAnalyzingPhoto = false;
+  String? _invalidQrReason;
   late final ReferenceData _reference = widget.reference ?? ReferenceData();
   late final ImagePicker _picker = ImagePicker();
 
@@ -124,8 +125,8 @@ class _UserScreenState extends State<UserScreen> {
       case ScanSuccess(:final result, :final labelInfo):
         await _record(result, labelInfo);
         _runScan(result, labelInfo);
-      case ScanInvalidQr():
-        _showInvalidQr();
+      case ScanInvalidQr(:final reason):
+        _showInvalidQr(reason);
     }
   }
 
@@ -154,8 +155,8 @@ class _UserScreenState extends State<UserScreen> {
       case ScanSuccess(:final result, :final labelInfo):
         await _record(result, labelInfo);
         _runScan(result, labelInfo);
-      case ScanInvalidQr():
-        _showInvalidQr();
+      case ScanInvalidQr(:final reason):
+        _showInvalidQr(reason);
     }
   }
 
@@ -190,8 +191,8 @@ class _UserScreenState extends State<UserScreen> {
         case ScanSuccess(:final result, :final labelInfo):
           await _record(result, labelInfo);
           _runScan(result, labelInfo);
-        case ScanInvalidQr():
-          _showInvalidQr();
+        case ScanInvalidQr(:final reason):
+          _showInvalidQr(reason);
       }
     } finally {
       if (mounted) setState(() => _isAnalyzingPhoto = false);
@@ -200,7 +201,10 @@ class _UserScreenState extends State<UserScreen> {
 
   void _showPermissionDenied() => setState(() => _view = _ViewState.permissionDenied);
 
-  void _showInvalidQr() => setState(() => _view = _ViewState.invalidQr);
+  void _showInvalidQr([String? reason]) => setState(() {
+    _invalidQrReason = reason;
+    _view = _ViewState.invalidQr;
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -229,7 +233,7 @@ class _UserScreenState extends State<UserScreen> {
           CameraScanner(
             onCapture: _onCapture,
             onPermissionDenied: _showPermissionDenied,
-            onError: (_) => _showInvalidQr(),
+            onError: (message) => _showInvalidQr(message),
           ),
           const SizedBox(height: 16),
           OutlinedButton(onPressed: _showScan, child: const Text('Vazgeç')),
@@ -237,7 +241,7 @@ class _UserScreenState extends State<UserScreen> {
       ),
       _ViewState.result => ResultView(result: _result!, labelInfo: _labelInfo!, onRescan: _showScan),
       _ViewState.permissionDenied => PermissionDeniedView(onRetry: _showScan),
-      _ViewState.invalidQr => InvalidQrView(onRetry: _showScan),
+      _ViewState.invalidQr => InvalidQrView(onRetry: _showScan, reason: _invalidQrReason),
     };
 
     return AppScreen(
