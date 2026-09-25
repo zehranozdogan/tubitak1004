@@ -3,11 +3,11 @@
 // kısıtı) yerine burada gerçek Flutter State + IndexedStack-benzeri bir
 // switch kullanıldı (Flutter'da routing zaten var, o kısıtlama YOK).
 //
-// Kamera HENÜZ YOK: "Tazelik Tara" ve "Test senaryoları" mock_results.dart'taki
-// GERÇEK ColorEngineResult tipiyle sabit verileri gösterir. "Dosyadan test et"
-// ise GERÇEK: bu cihazda üretilmiş bir etiketin durum görselini tüm okuyucu
-// zincirinden geçirir (services/file_scan.dart). Kamera geldiğinde yalnızca
-// görüntü/QR-metni kaynağı değişecek, zincir AYNI kalacak.
+// Kamera+ML Kit/zxing2 gerçek; "Test senaryoları" mock_results.dart'taki
+// GERÇEK ColorEngineResult tipiyle sabit verileri gösterir (BİLEREK geçmişe
+// KAYDEDİLMEZ — bkz. data/scan_history.dart dosya başlığı). "Dosyadan test
+// et" ve kamera taraması GERÇEK sonuç üretir — ikisi de tamamlanınca
+// (rescanRecommended=false) geçmişe kaydedilir.
 
 import 'dart:io';
 
@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/label_store.dart';
 import '../../data/reference_data.dart';
+import '../../data/scan_history.dart';
 import '../../services/file_scan.dart';
 import '../../services/scan_service.dart';
 import '../../widgets/app_screen.dart';
@@ -29,11 +30,13 @@ import 'widgets/scan_view.dart';
 enum _ViewState { scan, camera, result, permissionDenied, invalidQr }
 
 class UserScreen extends StatefulWidget {
-  /// Test için enjekte edilebilir; null ise uygulama belge dizini/labels ve rootBundle.
+  /// Test için enjekte edilebilir; null ise uygulama belge dizini/labels,
+  /// scan_history.json ve rootBundle.
   final Directory? labelsDir;
+  final File? historyFile;
   final ReferenceData? reference;
 
-  const UserScreen({super.key, this.labelsDir, this.reference});
+  const UserScreen({super.key, this.labelsDir, this.historyFile, this.reference});
 
   @override
   State<UserScreen> createState() => _UserScreenState();
@@ -44,13 +47,16 @@ class _UserScreenState extends State<UserScreen> {
   ColorEngineResult? _result;
   LabelInfo? _labelInfo;
   List<StoredLabel> _storedLabels = const [];
+  List<ScanHistoryEntry> _history = const [];
   Directory? _dir;
+  File? _historyFile;
   late final ReferenceData _reference = widget.reference ?? ReferenceData();
 
   @override
   void initState() {
     super.initState();
     _loadStoredLabels();
+    _loadHistory();
   }
 
   Future<void> _loadStoredLabels() async {
@@ -68,6 +74,43 @@ class _UserScreenState extends State<UserScreen> {
     }
   }
 
+  Future<void> _loadHistory() async {
+    try {
+      final file = widget.historyFile ?? await defaultScanHistoryFile();
+      final history = await loadScanHistory(file);
+      if (mounted) {
+        setState(() {
+          _historyFile = file;
+          _history = history;
+        });
+      }
+    } catch (_) {
+      // Yerel depolama yok (ör. web): "Son okumalar" boş görünür.
+    }
+  }
+
+  /// GERÇEK (mock DEĞİL) bir sonucu geçmişe kaydeder — SADECE tamamlanmış
+  /// okumalar (bkz. data/scan_history.dart dosya başlığı).
+  Future<void> _record(ColorEngineResult result, LabelInfo labelInfo) async {
+    final file = _historyFile;
+    if (file == null || result.rescanRecommended) return;
+    try {
+      final updated = await appendScanHistory(
+        file,
+        ScanHistoryEntry(
+          productType: labelInfo.productType,
+          productId: labelInfo.productId,
+          when: DateTime.now(),
+          freshnessClass: result.freshnessClass,
+          technicalLevel: result.technicalLevel,
+        ),
+      );
+      if (mounted) setState(() => _history = updated);
+    } catch (_) {
+      // Geçmiş yazılamadı — sonucu göstermeye engel değil, sessizce geç.
+    }
+  }
+
   Future<void> _fileScan(StoredLabel label, String state) async {
     final dir = _dir;
     if (dir == null) return;
@@ -75,6 +118,7 @@ class _UserScreenState extends State<UserScreen> {
     if (!mounted) return;
     switch (outcome) {
       case ScanSuccess(:final result, :final labelInfo):
+        await _record(result, labelInfo);
         _runScan(result, labelInfo);
       case ScanInvalidQr():
         _showInvalidQr();
@@ -104,6 +148,7 @@ class _UserScreenState extends State<UserScreen> {
     if (!mounted) return;
     switch (outcome) {
       case ScanSuccess(:final result, :final labelInfo):
+        await _record(result, labelInfo);
         _runScan(result, labelInfo);
       case ScanInvalidQr():
         _showInvalidQr();
@@ -139,6 +184,7 @@ class _UserScreenState extends State<UserScreen> {
         testScenarios: testScenarios,
         storedLabels: _storedLabels,
         onFileScan: _fileScan,
+        recentReads: _history,
       ),
       _ViewState.camera => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

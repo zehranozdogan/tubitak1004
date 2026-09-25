@@ -63,20 +63,5 @@ const mockSpoiled = ColorEngineResult(
   notes: ['Mock veri — doğrulanmış eşik senaryosu (henüz gelmedi, önizleme).'],
 );
 
-class RecentRead {
-  final String product;
-  final String productId;
-  final String when;
-  final String freshnessClass;
-
-  const RecentRead({required this.product, required this.productId, required this.when, required this.freshnessClass});
-}
-
-// İleride bir okuma-geçmişi tablosundan gelecek — şimdilik sabit örnek veri.
-const mockRecentReads = [
-  RecentRead(product: 'Levrek', productId: 'TR45678', when: '14.09.2026 09:12', freshnessClass: 'fresh'),
-  RecentRead(product: 'Levrek', productId: 'TR45678', when: '13.09.2026 18:47', freshnessClass: 'transition'),
-  RecentRead(product: 'Çupra', productId: 'TR45521', when: '12.09.2026 11:03', freshnessClass: 'fresh'),
-  RecentRead(product: 'Levrek', productId: 'TR45678', when: '11.09.2026 16:30', freshnessClass: 'spoiled'),
-  RecentRead(product: 'Somon', productId: 'TR44210', when: '10.09.2026 08:55', freshnessClass: 'fresh'),
-];
+// "Son okumalar" artık GERÇEK (bkz. data/scan_history.dart) — burada mock
+// veri kaldırıldı (25 Eylül).

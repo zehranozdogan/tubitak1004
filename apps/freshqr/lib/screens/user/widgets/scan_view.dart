@@ -1,13 +1,14 @@
 // user_view.py::_scan_view + _file_test_card + _recent_reads_card'ın Dart
-// portu. Kamera henüz YOK (bkz. dosya başlığı notu diğer dosyalarda) —
-// "Tazelik Tara" butonu ve "Test senaryoları" mock sonuçları tetikler.
+// portu. "Test senaryoları" mock sonuç tetikler; "Son okumalar" ise
+// GERÇEK geçmiş (bkz. data/scan_history.dart) — Python prototipindeki
+// `_MOCK_RECENT_READS`'in aksine burada sabit örnek veri YOK.
 
 import 'package:flutter/material.dart';
 
+import '../../../data/label_store.dart';
+import '../../../data/scan_history.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/section_card.dart';
-import '../../../data/label_store.dart';
-import '../mock_results.dart';
 
 class ScanView extends StatelessWidget {
   final VoidCallback onScan;
@@ -17,12 +18,16 @@ class ScanView extends StatelessWidget {
   final List<StoredLabel> storedLabels;
   final void Function(StoredLabel label, String state) onFileScan;
 
+  /// Bu cihazda YAPILMIŞ GERÇEK okumalar (yeniden eskiye) — bkz. dosya başlığı.
+  final List<ScanHistoryEntry> recentReads;
+
   const ScanView({
     super.key,
     required this.onScan,
     required this.testScenarios,
     this.storedLabels = const [],
     required this.onFileScan,
+    this.recentReads = const [],
   });
 
   @override
@@ -121,49 +126,81 @@ class ScanView extends StatelessWidget {
   }
 
   Widget _recentReadsCard(BuildContext context) {
-    if (mockRecentReads.isEmpty) {
+    if (recentReads.isEmpty) {
       return SectionCard(
         title: 'Son okumalar',
         children: [Text('Henüz okuma yok.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))],
       );
     }
     final rows = <Widget>[];
-    for (var i = 0; i < mockRecentReads.length; i++) {
+    for (var i = 0; i < recentReads.length; i++) {
       if (i > 0) rows.add(const Divider(height: 1));
-      rows.add(_recentReadRow(context, mockRecentReads[i]));
+      rows.add(_recentReadRow(context, recentReads[i]));
     }
     return SectionCard(title: 'Son okumalar', children: rows);
   }
 
-  Widget _recentReadRow(BuildContext context, RecentRead entry) {
-    final label = freshnessLabels[entry.freshnessClass]!;
-    final color = freshnessColors[entry.freshnessClass]!;
-    final icon = freshnessIcons[entry.freshnessClass]!;
+  String _formatWhen(DateTime when) {
+    final local = when.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(local.day)}.${two(local.month)}.${local.year} ${two(local.hour)}:${two(local.minute)}';
+  }
+
+  Widget _recentReadRow(BuildContext context, ScanHistoryEntry entry) {
     final scheme = Theme.of(context).colorScheme;
+    // §7.2: freshnessClass yoksa (eşik tanımlı değil) sınıf rozeti UYDURULMAZ —
+    // nötr bir teknik-sonuç göstergesi kullanılır.
+    final cls = entry.freshnessClass;
+    final label = cls != null ? (freshnessLabels[cls] ?? cls.toUpperCase()) : (entry.technicalLevel ?? 'Teknik sonuç');
+    final color = cls != null ? (freshnessColors[cls] ?? scheme.primary) : scheme.onSurfaceVariant;
+    final icon = cls != null ? (freshnessIcons[cls] ?? Icons.info_outline) : Icons.science_outlined;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-              const SizedBox(width: AppSpacing.s),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${entry.product} · ${entry.productId}', style: const TextStyle(fontWeight: FontWeight.w500)),
-                  Text(entry.when, style: TextStyle(fontSize: AppTextSizes.caption, color: scheme.onSurfaceVariant)),
-                ],
-              ),
-            ],
+          Expanded(
+            child: Row(
+              children: [
+                Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                const SizedBox(width: AppSpacing.s),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${entry.productType} · ${entry.productId}',
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(_formatWhen(entry.when), style: TextStyle(fontSize: AppTextSizes.caption, color: scheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          Row(
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 4),
-              Text(label, style: TextStyle(fontSize: AppTextSizes.caption, fontWeight: FontWeight.w600, color: color)),
-            ],
+          const SizedBox(width: AppSpacing.s),
+          // Flexible: sağdaki rozet Row'u kendi içinde (uzun technicalLevel
+          // metni için) bir Flexible barındırıyor — Row'u BOUNDED genişlik
+          // vermeden (Expanded/Flexible ile sarmadan) içindeki Flexible'a
+          // izin YOKTUR (RenderFlex "unbounded width" hatası; widget testinde
+          // yakalandı, bkz. test/user_scan_history_widget_test.dart).
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: color),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: AppTextSizes.caption, fontWeight: FontWeight.w600, color: color),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -45,11 +45,33 @@ metinlerinin EKRANDA OLMADIĞI ayrıca test ediliyor.
 
 ## Doğrulama
 
-`flutter analyze` (0 uyarı), `flutter test` (40/40), `flutter build web` VE
+`flutter analyze` (0 uyarı), `flutter test` (47/47), `flutter build web` VE
 `flutter build apk --debug` gerçekten derlendi. `zxing2` (25 Eylül'de
 eklendi, aşağıya bkz.) SAF DART olduğu için bu app hâlâ hiçbir platformda
 yerel derleme (CMake/NDK) gerektirmiyor — `flutter run -d chrome` de
 sorunsuz çalışmalı.
+
+## Son okumalar: GERÇEK geçmiş (25 Eylül)
+
+Python prototipindeki `_MOCK_RECENT_READS` (sabit örnek veri) kaldırıldı —
+`data/scan_history.dart` bu cihazda YAPILMIŞ gerçek okumaları yerel bir
+JSON dosyasında tutuyor (`getApplicationDocumentsDirectory()/scan_history.json`,
+en fazla 30 kayıt, yeniden eskiye). SADECE tamamlanmış okumalar (kamera VE
+"Dosyadan test et") kaydediliyor; "Test senaryoları" (mock düğmeleri) VE
+"Yeniden tara" ile biten yarım taramalar BİLİNÇLİ OLARAK kaydedilmiyor —
+gerçek olmayan/yarım bir sonucu "geçmiş" gibi göstermek dürüst değil.
+`freshnessClass` yoksa (§7.2) satırda sınıf rozeti değil `technicalLevel`
+gösterilir.
+
+**Test yazarken öğrenilen gerçek ders:** `Directory.createTemp`/dosya
+okuma gibi GERÇEK G/Ç çağrıları `testWidgets` gövdesinin içine DOĞRUDAN
+yazılırsa (ne `setUp`'ta ne `tester.runAsync()` içinde) test SONSUZA
+TAKILIYOR (`flutter_test`'in FakeAsync bölgesi gerçek I/O'nun tamamlanma
+sinyalini asla görmüyor) — hatayı yeniden üretmeden önce bilinmiyordu,
+bkz. `test/user_scan_history_widget_test.dart` başlığı. Aynı sırada bir
+render hatası da bulundu: `Flexible`, kendisini saran Row'a `Expanded`/
+`Flexible` ile bounded genişlik verilmeden kullanılamıyor — `_recentReadRow`
+düzeltildi.
 
 ## Decoder: ML Kit + zxing2 (rapor §11: "en az iki decoder")
 
