@@ -45,11 +45,56 @@ metinlerinin EKRANDA OLMADIĞI ayrıca test ediliyor.
 
 ## Doğrulama
 
-`flutter analyze` (0 uyarı), `flutter test` (40/40), `flutter build web` VE
+`flutter analyze` (0 uyarı), `flutter test` (52/52), `flutter build web` VE
 `flutter build apk --debug` gerçekten derlendi. `zxing2` (25 Eylül'de
 eklendi, aşağıya bkz.) SAF DART olduğu için bu app hâlâ hiçbir platformda
 yerel derleme (CMake/NDK) gerektirmiyor — `flutter run -d chrome` de
 sorunsuz çalışmalı.
+
+## Cihazdan fotoğraf yükleme (25 Eylül)
+
+"Tazelik Tara"nın altındaki "Cihazdan Fotoğraf Yükle" düğmesi — galeriden/
+dosyadan seçilen bir görseli aynı GERÇEK zincirden (`services/
+static_image_scan.dart`) geçirir. Canlı kameranın aksine **tüm
+platformlarda çalışır** (`image_picker`: Android/iOS/web tam, Windows/
+macOS/Linux `file_selector` üzerinden — galeri seçimi için yeterli, kamera
+KAYNAĞI kullanılmıyor) — Windows'ta bile GERÇEK bir fotoğrafla test
+edilebilir, tek kamerasız-olmayan gerçek doğrulama yolu budur.
+
+İki decoder (ML Kit dosya yolundan + zxing2 yedek) aynı canlı kamera
+mantığıyla dener. EXIF döndürme elle uygulanıyor (`img.bakeOrientation` —
+`package:image`'in `decodeImage`'i bunu OTOMATİK yapmıyor, elle
+doğrulandı). Test: `test/static_image_scan_test.dart` — gerçek PNG
+dosyasından uçtan uca (ML Kit'siz ortamda zxing2 yolu dahil, bozuk/kısa
+dosyalarda çökmeme dahil).
+
+**Test yazarken bulunan bir gerçek: `flutter test`, host işletim sistemi
+ne olursa olsun `defaultTargetPlatform`'u Android'e sabitliyor** —
+`cameraScanSupported` gibi platform kontrolleri test ortamında YANILTICI
+olabilir; testler `debugDefaultTargetPlatformOverride` ile bunu elle
+geçersiz kılmalı (bkz. dosyanın kendi başlığı).
+
+## Son okumalar: GERÇEK geçmiş (25 Eylül)
+
+Python prototipindeki `_MOCK_RECENT_READS` (sabit örnek veri) kaldırıldı —
+`data/scan_history.dart` bu cihazda YAPILMIŞ gerçek okumaları yerel bir
+JSON dosyasında tutuyor (`getApplicationDocumentsDirectory()/scan_history.json`,
+en fazla 30 kayıt, yeniden eskiye). SADECE tamamlanmış okumalar (kamera VE
+"Dosyadan test et") kaydediliyor; "Test senaryoları" (mock düğmeleri) VE
+"Yeniden tara" ile biten yarım taramalar BİLİNÇLİ OLARAK kaydedilmiyor —
+gerçek olmayan/yarım bir sonucu "geçmiş" gibi göstermek dürüst değil.
+`freshnessClass` yoksa (§7.2) satırda sınıf rozeti değil `technicalLevel`
+gösterilir.
+
+**Test yazarken öğrenilen gerçek ders:** `Directory.createTemp`/dosya
+okuma gibi GERÇEK G/Ç çağrıları `testWidgets` gövdesinin içine DOĞRUDAN
+yazılırsa (ne `setUp`'ta ne `tester.runAsync()` içinde) test SONSUZA
+TAKILIYOR (`flutter_test`'in FakeAsync bölgesi gerçek I/O'nun tamamlanma
+sinyalini asla görmüyor) — hatayı yeniden üretmeden önce bilinmiyordu,
+bkz. `test/user_scan_history_widget_test.dart` başlığı. Aynı sırada bir
+render hatası da bulundu: `Flexible`, kendisini saran Row'a `Expanded`/
+`Flexible` ile bounded genişlik verilmeden kullanılamıyor — `_recentReadRow`
+düzeltildi.
 
 ## Decoder: ML Kit + zxing2 (rapor §11: "en az iki decoder")
 
