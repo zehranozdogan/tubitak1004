@@ -46,6 +46,8 @@ void main() {
     await tester.tap(find.text('Kullanıcı'));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Düşük kalite'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Düşük kalite'));
     await tester.pumpAndSettle();
 

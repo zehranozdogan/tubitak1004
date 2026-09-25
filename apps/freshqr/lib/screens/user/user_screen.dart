@@ -13,12 +13,14 @@ import 'dart:io';
 
 import 'package:color_engine/color_engine.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../data/label_store.dart';
 import '../../data/reference_data.dart';
 import '../../data/scan_history.dart';
 import '../../services/file_scan.dart';
 import '../../services/scan_service.dart';
+import '../../services/static_image_scan.dart';
 import '../../widgets/app_screen.dart';
 import 'mock_results.dart';
 import 'widgets/camera_scanner.dart';
@@ -50,7 +52,9 @@ class _UserScreenState extends State<UserScreen> {
   List<ScanHistoryEntry> _history = const [];
   Directory? _dir;
   File? _historyFile;
+  bool _isAnalyzingPhoto = false;
   late final ReferenceData _reference = widget.reference ?? ReferenceData();
+  late final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -163,6 +167,37 @@ class _UserScreenState extends State<UserScreen> {
     });
   }
 
+  /// "Cihazdan Fotoğraf Yükle": galeriden/dosyadan bir görsel seçip GERÇEK
+  /// zincirden geçirir (bkz. services/static_image_scan.dart) — tüm
+  /// platformlarda çalışır (kamera aksine).
+  Future<void> _uploadPhoto() async {
+    final XFile? picked;
+    try {
+      picked = await _picker.pickImage(source: ImageSource.gallery);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fotoğraf seçilemedi: $e')));
+      }
+      return;
+    }
+    if (picked == null) return; // kullanıcı vazgeçti
+
+    setState(() => _isAnalyzingPhoto = true);
+    try {
+      final outcome = await analyzePickedImagePath(picked.path, _reference);
+      if (!mounted) return;
+      switch (outcome) {
+        case ScanSuccess(:final result, :final labelInfo):
+          await _record(result, labelInfo);
+          _runScan(result, labelInfo);
+        case ScanInvalidQr():
+          _showInvalidQr();
+      }
+    } finally {
+      if (mounted) setState(() => _isAnalyzingPhoto = false);
+    }
+  }
+
   void _showPermissionDenied() => setState(() => _view = _ViewState.permissionDenied);
 
   void _showInvalidQr() => setState(() => _view = _ViewState.invalidQr);
@@ -185,6 +220,8 @@ class _UserScreenState extends State<UserScreen> {
         storedLabels: _storedLabels,
         onFileScan: _fileScan,
         recentReads: _history,
+        onUploadPhoto: _uploadPhoto,
+        isAnalyzingPhoto: _isAnalyzingPhoto,
       ),
       _ViewState.camera => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

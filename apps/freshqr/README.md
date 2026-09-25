@@ -45,11 +45,34 @@ metinlerinin EKRANDA OLMADIĞI ayrıca test ediliyor.
 
 ## Doğrulama
 
-`flutter analyze` (0 uyarı), `flutter test` (47/47), `flutter build web` VE
+`flutter analyze` (0 uyarı), `flutter test` (52/52), `flutter build web` VE
 `flutter build apk --debug` gerçekten derlendi. `zxing2` (25 Eylül'de
 eklendi, aşağıya bkz.) SAF DART olduğu için bu app hâlâ hiçbir platformda
 yerel derleme (CMake/NDK) gerektirmiyor — `flutter run -d chrome` de
 sorunsuz çalışmalı.
+
+## Cihazdan fotoğraf yükleme (25 Eylül)
+
+"Tazelik Tara"nın altındaki "Cihazdan Fotoğraf Yükle" düğmesi — galeriden/
+dosyadan seçilen bir görseli aynı GERÇEK zincirden (`services/
+static_image_scan.dart`) geçirir. Canlı kameranın aksine **tüm
+platformlarda çalışır** (`image_picker`: Android/iOS/web tam, Windows/
+macOS/Linux `file_selector` üzerinden — galeri seçimi için yeterli, kamera
+KAYNAĞI kullanılmıyor) — Windows'ta bile GERÇEK bir fotoğrafla test
+edilebilir, tek kamerasız-olmayan gerçek doğrulama yolu budur.
+
+İki decoder (ML Kit dosya yolundan + zxing2 yedek) aynı canlı kamera
+mantığıyla dener. EXIF döndürme elle uygulanıyor (`img.bakeOrientation` —
+`package:image`'in `decodeImage`'i bunu OTOMATİK yapmıyor, elle
+doğrulandı). Test: `test/static_image_scan_test.dart` — gerçek PNG
+dosyasından uçtan uca (ML Kit'siz ortamda zxing2 yolu dahil, bozuk/kısa
+dosyalarda çökmeme dahil).
+
+**Test yazarken bulunan bir gerçek: `flutter test`, host işletim sistemi
+ne olursa olsun `defaultTargetPlatform`'u Android'e sabitliyor** —
+`cameraScanSupported` gibi platform kontrolleri test ortamında YANILTICI
+olabilir; testler `debugDefaultTargetPlatformOverride` ile bunu elle
+geçersiz kılmalı (bkz. dosyanın kendi başlığı).
 
 ## Son okumalar: GERÇEK geçmiş (25 Eylül)
 

@@ -21,6 +21,12 @@ class ScanView extends StatelessWidget {
   /// Bu cihazda YAPILMIŞ GERÇEK okumalar (yeniden eskiye) — bkz. dosya başlığı.
   final List<ScanHistoryEntry> recentReads;
 
+  /// Cihazdan (galeri/dosya) fotoğraf seçip GERÇEK analiz zincirinden
+  /// geçirir — kamerasız, tüm platformlarda çalışır (bkz. services/
+  /// static_image_scan.dart).
+  final VoidCallback onUploadPhoto;
+  final bool isAnalyzingPhoto;
+
   const ScanView({
     super.key,
     required this.onScan,
@@ -28,6 +34,8 @@ class ScanView extends StatelessWidget {
     this.storedLabels = const [],
     required this.onFileScan,
     this.recentReads = const [],
+    required this.onUploadPhoto,
+    this.isAnalyzingPhoto = false,
   });
 
   @override
@@ -60,6 +68,17 @@ class ScanView extends StatelessWidget {
             onPressed: onScan,
             icon: const Icon(Icons.qr_code_scanner),
             label: const Text('Tazelik Tara'),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton.icon(
+            onPressed: isAnalyzingPhoto ? null : onUploadPhoto,
+            icon: isAnalyzingPhoto
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.photo_library_outlined),
+            label: Text(isAnalyzingPhoto ? 'Analiz ediliyor…' : 'Cihazdan Fotoğraf Yükle'),
           ),
         ),
         const SizedBox(height: AppSpacing.m),

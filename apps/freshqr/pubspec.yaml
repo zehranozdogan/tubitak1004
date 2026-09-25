@@ -60,6 +60,12 @@ dependencies:
   google_mlkit_barcode_scanning: ^0.14.1
   permission_handler: ^11.3.1
 
+  # Cihazdan fotoğraf yükleme (galeri/dosya) — canlı kamerasız statik test.
+  # Galeri seçimi Android/iOS/web'de tam, Windows/macOS/Linux'ta file_selector
+  # üzerinden (sınırlı ama galeri seçimi için yeterli — kamera KAYNAĞI ayrı,
+  # kullanılmıyor).
+  image_picker: ^1.2.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
