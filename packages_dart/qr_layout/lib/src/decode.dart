@@ -54,19 +54,34 @@ class ZxingDecodeResult {
 /// `image`'de bir QR arar/çözer. Bulamazsa/çözemezse `null` (istisna
 /// fırlatmaz — ML Kit'in bulamama davranışıyla tutarlı, çağıran tarafın
 /// "dene, olmazsa diğerine geç" akışına uysun diye).
+///
+/// BİNARİZER SEÇİMİ (25 Eylül, gerçek cihaz testinde bulunan hata): önce
+/// `GlobalHistogramBinarizer` kullanılıyordu (zxing2'nin README örneğindeki
+/// gibi) — bu, TÜM görüntü için TEK bir eşik hesaplıyor, düzensiz ışık/
+/// gölge altında (gerçek bir telefon fotoğrafı — basılı etiket, oda ışığı)
+/// başarısız oluyordu (telefonla çekilmiş basılı etiket fotoğrafında "QR
+/// bulunamadı", zxing2'nin kendi sınıf dokümanı bunu AÇIKÇA uyarıyor:
+/// "tends to [fail] with severe shadows and gradients"). `HybridBinarizer`
+/// (aynı dokümanda "recommended class for library users") BÖLGESEL eşik
+/// hesaplıyor — önce bunu, olmazsa (görüntü çok küçükse HybridBinarizer
+/// minimum boyut ister) Global'e düşer.
 ZxingDecodeResult? decodeQrZxing(img.Image image) {
-  final source = zx.RGBLuminanceSource(
-    image.width,
-    image.height,
-    image.convert(numChannels: 4).getBytes(order: img.ChannelOrder.abgr).buffer.asInt32List(),
-  );
-  final bitmap = zx.BinaryBitmap(zx.GlobalHistogramBinarizer(source));
-  final zx.Result result;
-  try {
-    result = zx.QRCodeReader().decode(bitmap);
-  } catch (_) {
-    return null;
+  zx.LuminanceSource source() => zx.RGBLuminanceSource(
+        image.width,
+        image.height,
+        image.convert(numChannels: 4).getBytes(order: img.ChannelOrder.abgr).buffer.asInt32List(),
+      );
+
+  zx.Result? result;
+  for (final binarizer in [zx.HybridBinarizer(source()), zx.GlobalHistogramBinarizer(source())]) {
+    try {
+      result = zx.QRCodeReader().decode(zx.BinaryBitmap(binarizer));
+      break;
+    } catch (_) {
+      continue;
+    }
   }
+  if (result == null) return null;
 
   final pts = result.resultPoints;
   QrFinderPoints? finderPoints;

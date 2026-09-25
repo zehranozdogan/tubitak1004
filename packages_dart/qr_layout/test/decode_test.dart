@@ -4,10 +4,39 @@
 import 'package:image/image.dart' as img;
 import 'package:qr_layout/qr_layout.dart';
 import 'package:test/test.dart';
+import 'package:zxing2/qrcode.dart' as zx;
 
 const _matrixSize = 65; // gerçek: GENIPIN payload -> qr version 12
 const _scale = 10;
 const _border = 4;
+
+/// Üstten alta doğru KOYULAŞAN bir gölge — gerçek bir telefon fotoğrafındaki
+/// düzensiz oda ışığını/gölgeyi taklit eder (tek yönlü ışık kaynağı).
+img.Image _withGradientShadow(img.Image src, double darkFactor) {
+  final out = src.clone();
+  for (var y = 0; y < out.height; y++) {
+    final factor = 1.0 - darkFactor * (y / out.height);
+    for (var x = 0; x < out.width; x++) {
+      final p = out.getPixel(x, y);
+      out.setPixelRgb(x, y, (p.r * factor).round(), (p.g * factor).round(), (p.b * factor).round());
+    }
+  }
+  return out;
+}
+
+bool _decodeWithGlobalHistogramOnly(img.Image image) {
+  final source = zx.RGBLuminanceSource(
+    image.width,
+    image.height,
+    image.convert(numChannels: 4).getBytes(order: img.ChannelOrder.abgr).buffer.asInt32List(),
+  );
+  try {
+    zx.QRCodeReader().decode(zx.BinaryBitmap(zx.GlobalHistogramBinarizer(source)));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
 
 img.Image _renderReal() {
   final qr = generateQr(
@@ -43,6 +72,20 @@ void main() {
       final blank = img.Image(width: 200, height: 200, numChannels: 3);
       img.fill(blank, color: img.ColorRgb8(255, 255, 255));
       expect(decodeQrZxing(blank), isNull);
+    });
+
+    test(
+        'GERÇEK CİHAZ BUG REGRESYONU (25 Eylül): düzensiz ışık gölgesi altında '
+        'HybridBinarizer çözer, GlobalHistogramBinarizer (eski, tek başına) ÇÖZEMEZ', () {
+      final clean = _renderReal();
+      // darkFactor 0.5/0.65: telefonla çekilmiş basılı bir etiketin
+      // "Görselde okunabilir bir FreshQR etiketi bulunamadı" hatası
+      // vermesine yol açan GERÇEK örüntü — bkz. dosya başlığı.
+      for (final darkFactor in [0.5, 0.65]) {
+        final shaded = _withGradientShadow(clean, darkFactor);
+        expect(_decodeWithGlobalHistogramOnly(shaded), isFalse, reason: 'darkFactor=$darkFactor: eski davranış ZATEN başarısızdı (regresyon varsayımı)');
+        expect(decodeQrZxing(shaded), isNotNull, reason: 'darkFactor=$darkFactor: HybridBinarizer içeren GÜNCEL decodeQrZxing çözebilmeli');
+      }
     });
 
     test('24 etikette (8 parti no × 3 durum) temiz görüntüde TAMAMI çözülür', () {

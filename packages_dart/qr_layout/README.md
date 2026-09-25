@@ -60,6 +60,17 @@ distance transform, safety score, crc32) ise gerçek Python ile BİREBİR.
   gerçek kamera perspektifinde henüz doğrulanmadı). 24 etikette (3
   durum × 8 parti no) temiz görüntüde 36/36 çözüldü.
 
+  **GERÇEK CİHAZ HATASI (25 Eylül) — bulundu ve düzeltildi:** telefonla
+  çekilmiş basılı bir etiket fotoğrafı hep "bulunamadı" veriyordu.
+  Sebep: `GlobalHistogramBinarizer` (README örneğindeki varsayılan) TÜM
+  görüntü için TEK bir eşik hesaplıyor — düzensiz oda ışığı/gölge altında
+  başarısız oluyor (zxing2'nin KENDİ dokümanı bunu uyarıyor). `HybridBinarizer`
+  (aynı dokümanda "recommended class for library users") BÖLGESEL eşik
+  kullanıyor; şimdi önce o deneniyor, olmazsa Global'e düşülüyor. Regresyon
+  testiyle KANITLANDI: yapay bir ışık gradyanında (darkFactor 0.5/0.65)
+  eski (Global-yalnız) davranış BAŞARISIZ, güncel (Hybrid+Global) BAŞARILI
+  (bkz. test/decode_test.dart "GERÇEK CİHAZ BUG REGRESYONU").
+
 `render.py` (SVG/PNG rasterize) Flutter'da `CustomPainter` yerine doğrudan
 piksel üreten `render.dart`'a taşındı (zehra, 23-24 Eylül) —
 `renderColoredImage`/`renderLabelImage`/`syntheticStatesPngBytes`.
