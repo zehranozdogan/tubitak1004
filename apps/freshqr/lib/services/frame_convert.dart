@@ -12,6 +12,7 @@
 import 'dart:typed_data';
 
 import 'package:color_engine/color_engine.dart';
+import 'package:image/image.dart' as img;
 
 int _clamp255(double v) => v < 0 ? 0 : (v > 255 ? 255 : v.round());
 
@@ -89,4 +90,19 @@ RgbImage bgraToRgbImage(
     }
   }
   return RgbImage(width: out.width, height: out.height, pixels: pixels);
+}
+
+/// `color_engine.RgbImage` -> `package:image`'in `Image`'i — zxing2 yedek
+/// decoder'ı (`qr_layout.decodeQrZxing`) bunu bekliyor. `nv21ToRgbImage`/
+/// `bgraToRgbImage`'in DÖNDÜRÜLMÜŞ (dik) çıktısını olduğu gibi taşır,
+/// yeniden dönüştürmez.
+img.Image rgbToImgImage(RgbImage image) {
+  final out = img.Image(width: image.width, height: image.height, numChannels: 3);
+  for (var y = 0; y < image.height; y++) {
+    for (var x = 0; x < image.width; x++) {
+      final p = image.at(x, y);
+      out.setPixelRgb(x, y, p.r.toInt(), p.g.toInt(), p.b.toInt());
+    }
+  }
+  return out;
 }

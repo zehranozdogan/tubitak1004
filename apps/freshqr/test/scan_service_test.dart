@@ -6,7 +6,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:color_engine/color_engine.dart' show canonicalQrCorners;
+import 'package:color_engine/color_engine.dart' show Rgb, RgbImage, canonicalQrCorners;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freshqr/data/reference_data.dart';
 import 'package:freshqr/services/scan_service.dart';
@@ -102,5 +102,69 @@ void main() {
         expect(outcome.result.confidence!, greaterThan(0.99), reason: 'TR$n $state');
       }
     }
+  });
+
+  test(
+      'zxing2 yedek decoder yolu (finderPoints): ML Kit corners YERİNE zxing2\'nin finder '
+      'noktalarından kestirilen köşelerle çalışır, ML Kit yoluyla AYNI sonucu verir', () async {
+    final ref = ReferenceData(_fileReader);
+    final profile = await ref.sensorProfile('DEMO_QR_STATE_COLORS_v1');
+    final label = _label();
+    final image = qr_layout.renderLabelImage(label.qr, label.layoutJson, profile.raw, state: 'transition');
+    final rgbImage = rgbImageFromImage(image);
+    final qrText = label_export.labelPayloadQrText(label.payload);
+
+    final viaCorners = await analyzeCapturedLabel(
+      qrText: qrText,
+      image: rgbImage,
+      corners: canonicalQrCorners(label.layout.matrixSize),
+      reference: ref,
+    ) as ScanSuccess;
+
+    final decoded = qr_layout.decodeQrZxing(image);
+    expect(decoded, isNotNull, reason: 'zxing2 bu görüntüyü çözebilmeli');
+    expect(decoded!.finderPoints, isNotNull);
+    final viaFinderPoints = await analyzeCapturedLabel(
+      qrText: decoded.text,
+      image: rgbImage,
+      finderPoints: decoded.finderPoints,
+      reference: ref,
+    ) as ScanSuccess;
+
+    expect(viaFinderPoints.result.freshnessClass, viaCorners.result.freshnessClass);
+    expect(viaFinderPoints.result.deltaE, closeTo(viaCorners.result.deltaE!, 0.5));
+    expect(viaFinderPoints.result.rescanRecommended, isFalse);
+  });
+
+  test('corners VE finderPoints ikisi de verilirse -> ArgumentError', () async {
+    final ref = ReferenceData(_fileReader);
+    final label = _label();
+    expect(
+      () => analyzeCapturedLabel(
+        qrText: label_export.labelPayloadQrText(label.payload),
+        image: RgbImage.filled(10, 10, const Rgb(0, 0, 0)),
+        corners: canonicalQrCorners(label.layout.matrixSize),
+        finderPoints: const qr_layout.QrFinderPoints(
+          topLeft: (x: 0, y: 0),
+          topRight: (x: 1, y: 0),
+          bottomLeft: (x: 0, y: 1),
+        ),
+        reference: ref,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('ne corners ne finderPoints verilirse -> ArgumentError', () async {
+    final ref = ReferenceData(_fileReader);
+    final label = _label();
+    expect(
+      () => analyzeCapturedLabel(
+        qrText: label_export.labelPayloadQrText(label.payload),
+        image: RgbImage.filled(10, 10, const Rgb(0, 0, 0)),
+        reference: ref,
+      ),
+      throwsArgumentError,
+    );
   });
 }
