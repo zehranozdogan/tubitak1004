@@ -249,25 +249,39 @@ InputImage? _toInputImage(CameraImage image, int sensorOrientation) {
 }
 
 /// Android NV21 karesini (dosya başlığındaki notta açıklanan gerçek-cihaz
-/// hatasına karşı) tek, tutarlı bir (bayt, satır-adımı) çiftine çevirir.
+/// hatasına karşı) her zaman DOLGUSUZ/sıkı paketlenmiş (stride==width) bir
+/// (bayt, satır-adımı) çiftine çevirir.
 ///
 /// GERÇEK CİHAZ HATASI #2 (27 Eylül, aynı gün): `image.planes` cihaza göre
 /// FARKLI sayıda eleman verebiliyor — bazı cihazlar Y ve VU'yu AYRI iki
-/// `Plane` olarak verir (aşağıdaki `repackNv21` yolu), bazıları NV21'i
-/// (Y+VU bitişik) TEK bir `Plane` olarak verir. İkinciyi de sabit
-/// `image.planes[1]` ile okumaya çalışmak `RangeError` fırlatıyordu — bu
-/// yüzden burada gerçek uzunluk kontrol ediliyor.
+/// `Plane` olarak verir, bazıları NV21'i (Y+VU bitişik) TEK bir `Plane`
+/// olarak verir. İkinciyi sabit `image.planes[1]` ile okumaya çalışmak
+/// `RangeError` fırlatıyordu.
+///
+/// GERÇEK CİHAZ HATASI #3 (aynı gün, #2'nin düzeltmesi YETERSİZDİ): tek
+/// düzlem durumunda "ham veriyi kendi satır adımıyla olduğu gibi ML Kit'e
+/// ver" yeterli değilmiş — `InputImageConverterError` AYNEN devam etti.
+/// Artık HER iki durumda da `repackNv21` ile dolgu temizleniyor; tek
+/// düzlemde VU bölümü, Y bölümünün BİTTİĞİ bayt konumundan (`height *
+/// bytesPerRow`) başlayan bir GÖRÜNÜM (`Uint8List.sublistView`, kopyasız)
+/// olarak, Y ile AYNI satır adımıyla veriliyor (aynı bitişik tampon).
 ({Uint8List bytes, int bytesPerRow}) _nv21Data(CameraImage image) {
-  if (image.planes.length < 2) {
-    // Tek düzlem: Y+VU zaten bitişik TEK bir tamponda — `nv21ToRgbImage`
-    // (ve ML Kit) bu düzlemin KENDİ satır adımını her iki bölüm için de
-    // (Y ve VU) aynı kabul edip doğru okuyor, dolayısıyla yeniden
-    // paketlemeye gerek yok.
+  final Uint8List yBytes;
+  final int yStride;
+  final Uint8List vuBytes;
+  final int vuStride;
+  if (image.planes.length >= 2) {
+    yBytes = image.planes[0].bytes;
+    yStride = image.planes[0].bytesPerRow;
+    vuBytes = image.planes[1].bytes;
+    vuStride = image.planes[1].bytesPerRow;
+  } else {
     final plane = image.planes.first;
-    return (bytes: plane.bytes, bytesPerRow: plane.bytesPerRow);
+    yBytes = plane.bytes;
+    yStride = plane.bytesPerRow;
+    vuBytes = Uint8List.sublistView(plane.bytes, image.height * yStride);
+    vuStride = yStride;
   }
-  final y = image.planes[0];
-  final vu = image.planes[1];
-  final packed = repackNv21(y.bytes, y.bytesPerRow, vu.bytes, vu.bytesPerRow, image.width, image.height);
+  final packed = repackNv21(yBytes, yStride, vuBytes, vuStride, image.width, image.height);
   return (bytes: packed, bytesPerRow: image.width); // repackNv21 dolgusuz (stride==width) üretir
 }
