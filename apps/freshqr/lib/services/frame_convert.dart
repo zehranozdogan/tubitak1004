@@ -16,6 +16,46 @@ import 'package:image/image.dart' as img;
 
 int _clamp255(double v) => v < 0 ? 0 : (v > 255 ? 255 : v.round());
 
+/// Android kamerasının Y + VU (NV21) iki düzlemini, olası satır dolgusunu
+/// (padding) kaldırarak TEK, SIKI paketlenmiş (stride == width) bir NV21
+/// tamponuna birleştirir.
+///
+/// GERÇEK CİHAZ HATASI (27 Eylül): önceki yöntem düzlemlerin bayt dizilerini
+/// (`plane.bytes`) ham hâlde art arda ekliyordu, sonra hem `nv21ToRgbImage`
+/// hem ML Kit'in `InputImageMetadata`'sı TEK bir `bytesPerRow` (Y'ninki)
+/// varsayıyordu. Emülatörde/webcam-relay'de Y ve VU düzlemlerinin satır
+/// adımı (bytesPerRow) `width`'e eşitti (dolgu yok) — bu yüzden orada
+/// tesadüfen çalışıyordu. Gerçek telefonda donanım hizalaması yüzünden
+/// `bytesPerRow > width` çıktı (VE Y/VU'nun dolgusu FARKLI olabiliyor) —
+/// tek stride varsayımı bozuk veri üretip ML Kit'te
+/// `PlatformException(InputImageConverterError)` fırlattı. Bu fonksiyon
+/// her düzlemi KENDİ `bytesPerRow`'una göre satır satır okuyup dolguyu atar;
+/// çıktının stride'ı her zaman `width`'tir (padding yok), bu yüzden hem
+/// `nv21ToRgbImage` hem ML Kit'e `bytesPerRow: width` verilebilir.
+Uint8List repackNv21(
+  Uint8List yBytes,
+  int yBytesPerRow,
+  Uint8List vuBytes,
+  int vuBytesPerRow,
+  int width,
+  int height,
+) {
+  final out = Uint8List(width * height + width * (height ~/ 2));
+  var offset = 0;
+  for (var row = 0; row < height; row++) {
+    final start = row * yBytesPerRow;
+    out.setRange(offset, offset + width, yBytes, start);
+    offset += width;
+  }
+  final chromaRows = height ~/ 2;
+  for (var row = 0; row < chromaRows; row++) {
+    final start = row * vuBytesPerRow;
+    out.setRange(offset, offset + width, vuBytes, start);
+    offset += width;
+  }
+  return out;
+}
+
 /// (x, y) kaynak pikselinin, kare `rotation` derece (0/90/180/270, saat
 /// yönü) döndürülünce düşeceği (x, y) ve yeni boyutlar.
 ({int width, int height}) rotatedSize(int width, int height, int rotation) {

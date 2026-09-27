@@ -82,6 +82,31 @@ void main() {
     });
   });
 
+  group('repackNv21', () {
+    test('dolgu yok (bytesPerRow == width): olduğu gibi birleştirir', () {
+      final y = Uint8List.fromList([10, 20, 30, 40]); // 2x2
+      final vu = Uint8List.fromList([128, 128]); // 1x1 (2x2 -> chroma 1x1 çift)
+      final out = repackNv21(y, 2, vu, 2, 2, 2);
+      expect(out, [10, 20, 30, 40, 128, 128]);
+    });
+
+    test('Y ve VU düzlemleri FARKLI dolguyla (gerçek cihaz senaryosu): dolgu atılır', () {
+      // width=2, height=2. Y stride=4 (2 dolgu baytı/satır), VU stride=6.
+      final y = Uint8List.fromList([10, 20, 0, 0, 30, 40, 0, 0]);
+      final vu = Uint8List.fromList([128, 129, 0, 0, 0, 0]);
+      final out = repackNv21(y, 4, vu, 6, 2, 2);
+      // Y: 2 satır x 2 bayt (dolgusuz) + VU: 1 satır x 2 bayt (dolgusuz).
+      expect(out, [10, 20, 30, 40, 128, 129]);
+    });
+
+    test('çıktı boyutu her zaman width*height + width*(height~/2)', () {
+      final y = Uint8List(4 * 4);
+      final vu = Uint8List(4 * 2);
+      final out = repackNv21(y, 4, vu, 4, 4, 4);
+      expect(out.length, 4 * 4 + 4 * 2);
+    });
+  });
+
   test('bgraToRgbImage: kanal sırası B,G,R,A -> R,G,B', () {
     final data = Uint8List.fromList([1, 2, 3, 255, 4, 5, 6, 255]); // 2x1
     final img = bgraToRgbImage(data, 2, 1);

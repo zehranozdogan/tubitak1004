@@ -9,9 +9,18 @@
 //
 // SADECE Android/iOS: ML Kit başka platformu desteklemiyor (bkz.
 // `cameraScanSupported`) — zxing2 platform bağımsız ama kamera erişimi
-// zaten bu ikisine özel. Bu dosya gerçek cihazda henüz DENENMEDİ — saf
-// parçalar (frame_convert, qr_layout/decode.dart) test edildi, kamera/ML
-// Kit kısmı derleniyor ama cihaz doğrulaması bekliyor (README "kamera testi").
+// zaten bu ikisine özel.
+//
+// GERÇEK CİHAZ HATASI (27 Eylül, ilk gerçek telefon testinde bulundu):
+// Y/VU düzlemlerini ham bayt olarak art arda ekleyip (`_concatenatePlanes`)
+// TEK bir `bytesPerRow` varsaymak, gerçek telefonlarda donanım hizalaması
+// yüzünden satır dolgusu (padding, `bytesPerRow > width`) olduğunda ML
+// Kit'te `PlatformException(InputImageConverterError)` fırlatıyordu —
+// emülatörde/webcam-relay'de dolgu olmadığı için gizli kalmıştı. Düzeltme:
+// `frame_convert.dart::repackNv21` (bkz. o dosyanın başlığı) her düzlemi
+// KENDİ satır adımına göre okuyup dolgusuz, sıkı paketlenmiş bir tampon
+// üretiyor — hem ML Kit'e hem `nv21ToRgbImage`'a artık `bytesPerRow: width`
+// veriliyor.
 
 import 'dart:typed_data';
 
@@ -160,10 +169,10 @@ class _CameraScannerState extends State<CameraScanner> {
   RgbImage _frameToRgb(CameraImage image, int rotation) {
     return defaultTargetPlatform == TargetPlatform.android
         ? nv21ToRgbImage(
-            _concatenatePlanes(image.planes),
+            _nv21Bytes(image),
             image.width,
             image.height,
-            bytesPerRow: image.planes.first.bytesPerRow,
+            bytesPerRow: image.width, // repackNv21 dolgusuz (stride==width) üretir
             rotation: rotation,
           )
         : bgraToRgbImage(
@@ -219,12 +228,12 @@ InputImage? _toInputImage(CameraImage image, int sensorOrientation) {
 
   if (defaultTargetPlatform == TargetPlatform.android && format == InputImageFormat.nv21) {
     return InputImage.fromBytes(
-      bytes: _concatenatePlanes(image.planes),
+      bytes: _nv21Bytes(image),
       metadata: InputImageMetadata(
         size: Size(image.width.toDouble(), image.height.toDouble()),
         rotation: rotation,
         format: format,
-        bytesPerRow: image.planes.first.bytesPerRow,
+        bytesPerRow: image.width, // repackNv21 dolgusuz (stride==width) üretir
       ),
     );
   }
@@ -242,10 +251,11 @@ InputImage? _toInputImage(CameraImage image, int sensorOrientation) {
   return null;
 }
 
-Uint8List _concatenatePlanes(List<Plane> planes) {
-  final builder = BytesBuilder(copy: false);
-  for (final plane in planes) {
-    builder.add(plane.bytes);
-  }
-  return builder.toBytes();
+/// Android NV21 karesinin Y + VU düzlemlerini, dosya başlığındaki notta
+/// açıklanan gerçek-cihaz hatasına karşı `repackNv21` ile dolgusuz/sıkı
+/// paketlenmiş TEK bir tampona çevirir.
+Uint8List _nv21Bytes(CameraImage image) {
+  final y = image.planes[0];
+  final vu = image.planes[1];
+  return repackNv21(y.bytes, y.bytesPerRow, vu.bytes, vu.bytesPerRow, image.width, image.height);
 }
