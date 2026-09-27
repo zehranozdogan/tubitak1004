@@ -28,6 +28,16 @@ STATES = [("state_fresh", "Taze"), ("state_transition", "Geçiş"), ("state_spoi
 
 BASE_CM = 5.0  # A'nın (yamasız) fiziksel boyutu
 
+# GERÇEK BASKI HATASI (27 Eylül): varsayılan Word sayfa kenar boşluklarıyla
+# (1.25in = 3.175cm her yanda, Letter 21.59cm genişlik) kullanılabilir genişlik
+# sadece 15.24cm; 3 sütuna bölününce sütun başına ~5.08cm düşüyor. B/C'nin
+# gömülen boyutu (~5.55cm, aşağıdaki hesaplamayla) bundan BÜYÜK — sütuna
+# sığmayıp kenarları kırpılıyordu (kullanıcı gerçek baskıda fark etti). Düzeltme:
+# kenar boşluklarını daraltıp sütun genişliğini açıkça B/C'nin en büyük gömme
+# boyutundan belirgin ölçüde geniş tutuyoruz.
+MARGIN_CM = 1.27  # 0.5in
+COLUMN_CM = 6.3  # 5.55cm'lik en büyük görsel için bolca pay bırakır
+
 
 def _embed_size_cm(letter: str) -> float:
     """B/C'nin canvas'ı (yama şeridi yüzünden) A'dan büyük — aynı oranda
@@ -42,6 +52,10 @@ def _embed_size_cm(letter: str) -> float:
 
 def main() -> None:
     doc = Document()
+    section = doc.sections[0]
+    section.left_margin = Cm(MARGIN_CM)
+    section.right_margin = Cm(MARGIN_CM)
+
     for letter in METHODS:
         folder = REGEN_ROOT / letter
         size = Cm(_embed_size_cm(letter))
@@ -52,6 +66,7 @@ def main() -> None:
             img_path = next(folder.glob(f"*.{state_key}.png"))
 
             cap_cell = table.cell(0, col)
+            cap_cell.width = Cm(COLUMN_CM)
             p = cap_cell.paragraphs[0]
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             run = p.add_run(f"{letter} · {state_label}")
@@ -59,9 +74,16 @@ def main() -> None:
             run.font.size = Pt(9)
 
             img_cell = table.cell(1, col)
+            img_cell.width = Cm(COLUMN_CM)
             img_p = img_cell.paragraphs[0]
             img_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             img_p.add_run().add_picture(str(img_path), width=size, height=size)
+
+        # python-docx sütun genişliğini bazen sadece hücre bazında değil,
+        # tblGrid seviyesinde de tutarlı istiyor — ikisini birden set etmek
+        # Word/LibreOffice arasında en güvenilir sonucu veriyor.
+        for column in table.columns:
+            column.width = Cm(COLUMN_CM)
 
         doc.add_paragraph()
 

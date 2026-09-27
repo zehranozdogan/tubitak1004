@@ -19,8 +19,19 @@ class ResultView extends StatefulWidget {
   final ColorEngineResult result;
   final LabelInfo labelInfo;
   final VoidCallback onRescan;
+  // Kamera taramasında hangi decoder'ın bulduğunu göstermek için (geçici
+  // teşhis amaçlı, 27 Eylül — ML Kit'in bu cihazda arada çökmesi/zxing2'ye
+  // düşmesi kullanıcı tarafından ayırt edilemiyordu). Kamera dışı yollarda
+  // (dosya/mock) null — o zaman satır hiç gösterilmez.
+  final String? usedDecoder;
 
-  const ResultView({super.key, required this.result, required this.labelInfo, required this.onRescan});
+  const ResultView({
+    super.key,
+    required this.result,
+    required this.labelInfo,
+    required this.onRescan,
+    this.usedDecoder,
+  });
 
   @override
   State<ResultView> createState() => _ResultViewState();
@@ -120,6 +131,7 @@ class _ResultViewState extends State<ResultView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (widget.usedDecoder != null) KvRow('Okuyucu', widget.usedDecoder!),
                 MetricBar(label: 'Güven skoru', value: result.confidence),
                 KvRow('ΔE', result.deltaE != null ? result.deltaE!.toStringAsFixed(2) : '—'),
                 KvRow(

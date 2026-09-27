@@ -43,6 +43,17 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- ML Kit'e barkod modelini Play Store üzerinden KURULUM ANINDA
+             indirmesini söyler (bkz. developers.google.com/ml-kit/vision/
+             barcode-scanning/android#automatically-download). Bu olmadan
+             model sadece "ilk kullanımda tembel indirme" ile geliyor — Play
+             Store dışından (APK sideload) kurulumlarda bu indirme hiç
+             tetiklenmeyebiliyor, bu da native detector'ın null kalıp
+             NullPointerException atmasına yol açan senaryolardan biri
+             (gerçek cihaz hatası #4, 27 Eylül). -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -54,6 +54,9 @@ class _UserScreenState extends State<UserScreen> {
   File? _historyFile;
   bool _isAnalyzingPhoto = false;
   String? _invalidQrReason;
+  // Kamera taramasında hangi decoder'ın bulduğu (geçici teşhis amaçlı, bkz.
+  // widgets/result_view.dart). Kamera dışı yollarda null.
+  String? _usedDecoder;
   late final ReferenceData _reference = widget.reference ?? ReferenceData();
   late final ImagePicker _picker = ImagePicker();
 
@@ -154,16 +157,17 @@ class _UserScreenState extends State<UserScreen> {
     switch (outcome) {
       case ScanSuccess(:final result, :final labelInfo):
         await _record(result, labelInfo);
-        _runScan(result, labelInfo);
+        _runScan(result, labelInfo, capture.corners != null ? 'ML Kit' : 'zxing2 (yedek)');
       case ScanInvalidQr(:final reason):
         _showInvalidQr(reason);
     }
   }
 
-  void _runScan(ColorEngineResult result, [LabelInfo labelInfo = mockLabelInfo]) {
+  void _runScan(ColorEngineResult result, [LabelInfo labelInfo = mockLabelInfo, String? usedDecoder]) {
     setState(() {
       _result = result;
       _labelInfo = labelInfo;
+      _usedDecoder = usedDecoder;
       _view = _ViewState.result;
     });
   }
@@ -239,7 +243,12 @@ class _UserScreenState extends State<UserScreen> {
           OutlinedButton(onPressed: _showScan, child: const Text('Vazgeç')),
         ],
       ),
-      _ViewState.result => ResultView(result: _result!, labelInfo: _labelInfo!, onRescan: _showScan),
+      _ViewState.result => ResultView(
+        result: _result!,
+        labelInfo: _labelInfo!,
+        onRescan: _showScan,
+        usedDecoder: _usedDecoder,
+      ),
       _ViewState.permissionDenied => PermissionDeniedView(onRetry: _showScan),
       _ViewState.invalidQr => InvalidQrView(onRetry: _showScan, reason: _invalidQrReason),
     };
