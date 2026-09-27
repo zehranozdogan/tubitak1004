@@ -11,6 +11,16 @@
 // `cameraScanSupported`) — zxing2 platform bağımsız ama kamera erişimi
 // zaten bu ikisine özel.
 //
+// GERÇEK CİHAZ HATASI #4 (27 Eylül, aynı gün — #1/#2/#3 veri paketleme
+// hatalarını düzeltmemize RAĞMEN devam etti): ML Kit'in kendi native
+// dönüştürücüsü bu cihazda bir `NullPointerException` ile çöküyor
+// (Play Services/ML Kit kurulumuna özgü olabilir, bizim kontrolümüzde
+// değil). Çözüm: veriyi düzeltmeye çalışmak yerine SAVUNMACI ol —
+// `_scanner.processImage` çökerse `_mlKitBroken=true` işaretlenir ve o
+// karede DERHAL (15 kare beklemeden) zxing2'ye (saf Dart, ML Kit'in bu iç
+// sorunundan tamamen bağımsız) düşülür; sonraki karelerde ML Kit HİÇ
+// denenmez.
+//
 // GERÇEK CİHAZ HATASI (27 Eylül, ilk gerçek telefon testinde bulundu):
 // Y/VU düzlemlerini ham bayt olarak art arda ekleyip (`_concatenatePlanes`)
 // TEK bir `bytesPerRow` varsaymak, gerçek telefonlarda donanım hizalaması
@@ -73,6 +83,11 @@ class _CameraScannerState extends State<CameraScanner> {
   CameraController? _controller;
   int _frameCounter = 0;
   int _mlKitFailureStreak = 0;
+  // ML Kit bu cihazda GERÇEKTEN çöküyorsa (bkz. _onFrame — Play Services/ML
+  // Kit kurulumuna özgü bir NullPointerException gözlendi, 27 Eylül gerçek
+  // cihaz testi) bir kere işaretlenir; sonraki karelerde ML Kit'i HİÇ
+  // denemeden doğrudan zxing2'ye geçilir (gereksiz gecikme/tekrar çökme yok).
+  bool _mlKitBroken = false;
   bool _busy = false;
   bool _done = false;
 
@@ -129,27 +144,36 @@ class _CameraScannerState extends State<CameraScanner> {
       final controller = _controller;
       if (controller == null) return;
       final rotation = controller.description.sensorOrientation;
-      final input = _toInputImage(image, rotation);
-      if (input == null) return;
 
-      final barcodes = await _scanner.processImage(input);
-      for (final barcode in barcodes) {
-        final text = barcode.rawValue;
-        final points = barcode.cornerPoints;
-        if (barcode.format != BarcodeFormat.qrCode || text == null || points.length != 4) continue;
+      if (!_mlKitBroken) {
+        try {
+          final input = _toInputImage(image, rotation);
+          if (input != null) {
+            final barcodes = await _scanner.processImage(input);
+            for (final barcode in barcodes) {
+              final text = barcode.rawValue;
+              final points = barcode.cornerPoints;
+              if (barcode.format != BarcodeFormat.qrCode || text == null || points.length != 4) continue;
 
-        await _finish(
-          controller,
-          qrText: text,
-          rgb: _frameToRgb(image, rotation),
-          corners: [for (final p in points) [p.x.toDouble(), p.y.toDouble()]],
-        );
-        return;
+              await _finish(
+                controller,
+                qrText: text,
+                rgb: _frameToRgb(image, rotation),
+                corners: [for (final p in points) [p.x.toDouble(), p.y.toDouble()]],
+              );
+              return;
+            }
+            // ML Kit bu karede bulamadı — yedek decoder devreye girene kadar sayacı ilerlet.
+            _mlKitFailureStreak++;
+            if (_mlKitFailureStreak < _fallbackAfterFailures) return;
+          }
+        } catch (_) {
+          // ML Kit bu cihazda GERÇEKTEN çalışmıyor (dosya başlığındaki
+          // gerçek-cihaz notuna bkz.) — beklemeden zxing2'ye geç, sonraki
+          // karelerde ML Kit'i hiç denemeyelim.
+          _mlKitBroken = true;
+        }
       }
-
-      // ML Kit bu karede bulamadı — yedek decoder devreye girene kadar sayacı ilerlet.
-      _mlKitFailureStreak++;
-      if (_mlKitFailureStreak < _fallbackAfterFailures) return;
 
       final rgbForZxing = _frameToRgb(image, rotation);
       final zx = decodeQrZxing(rgbToImgImage(rgbForZxing));
