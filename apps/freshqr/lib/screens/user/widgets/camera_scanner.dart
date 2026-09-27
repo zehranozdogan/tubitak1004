@@ -167,21 +167,17 @@ class _CameraScannerState extends State<CameraScanner> {
   }
 
   RgbImage _frameToRgb(CameraImage image, int rotation) {
-    return defaultTargetPlatform == TargetPlatform.android
-        ? nv21ToRgbImage(
-            _nv21Bytes(image),
-            image.width,
-            image.height,
-            bytesPerRow: image.width, // repackNv21 dolgusuz (stride==width) üretir
-            rotation: rotation,
-          )
-        : bgraToRgbImage(
-            image.planes.first.bytes,
-            image.width,
-            image.height,
-            bytesPerRow: image.planes.first.bytesPerRow,
-            rotation: rotation,
-          );
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final nv21 = _nv21Data(image);
+      return nv21ToRgbImage(nv21.bytes, image.width, image.height, bytesPerRow: nv21.bytesPerRow, rotation: rotation);
+    }
+    return bgraToRgbImage(
+      image.planes.first.bytes,
+      image.width,
+      image.height,
+      bytesPerRow: image.planes.first.bytesPerRow,
+      rotation: rotation,
+    );
   }
 
   Future<void> _finish(
@@ -227,13 +223,14 @@ InputImage? _toInputImage(CameraImage image, int sensorOrientation) {
   if (format == null) return null;
 
   if (defaultTargetPlatform == TargetPlatform.android && format == InputImageFormat.nv21) {
+    final nv21 = _nv21Data(image);
     return InputImage.fromBytes(
-      bytes: _nv21Bytes(image),
+      bytes: nv21.bytes,
       metadata: InputImageMetadata(
         size: Size(image.width.toDouble(), image.height.toDouble()),
         rotation: rotation,
         format: format,
-        bytesPerRow: image.width, // repackNv21 dolgusuz (stride==width) üretir
+        bytesPerRow: nv21.bytesPerRow,
       ),
     );
   }
@@ -251,11 +248,26 @@ InputImage? _toInputImage(CameraImage image, int sensorOrientation) {
   return null;
 }
 
-/// Android NV21 karesinin Y + VU düzlemlerini, dosya başlığındaki notta
-/// açıklanan gerçek-cihaz hatasına karşı `repackNv21` ile dolgusuz/sıkı
-/// paketlenmiş TEK bir tampona çevirir.
-Uint8List _nv21Bytes(CameraImage image) {
+/// Android NV21 karesini (dosya başlığındaki notta açıklanan gerçek-cihaz
+/// hatasına karşı) tek, tutarlı bir (bayt, satır-adımı) çiftine çevirir.
+///
+/// GERÇEK CİHAZ HATASI #2 (27 Eylül, aynı gün): `image.planes` cihaza göre
+/// FARKLI sayıda eleman verebiliyor — bazı cihazlar Y ve VU'yu AYRI iki
+/// `Plane` olarak verir (aşağıdaki `repackNv21` yolu), bazıları NV21'i
+/// (Y+VU bitişik) TEK bir `Plane` olarak verir. İkinciyi de sabit
+/// `image.planes[1]` ile okumaya çalışmak `RangeError` fırlatıyordu — bu
+/// yüzden burada gerçek uzunluk kontrol ediliyor.
+({Uint8List bytes, int bytesPerRow}) _nv21Data(CameraImage image) {
+  if (image.planes.length < 2) {
+    // Tek düzlem: Y+VU zaten bitişik TEK bir tamponda — `nv21ToRgbImage`
+    // (ve ML Kit) bu düzlemin KENDİ satır adımını her iki bölüm için de
+    // (Y ve VU) aynı kabul edip doğru okuyor, dolayısıyla yeniden
+    // paketlemeye gerek yok.
+    final plane = image.planes.first;
+    return (bytes: plane.bytes, bytesPerRow: plane.bytesPerRow);
+  }
   final y = image.planes[0];
   final vu = image.planes[1];
-  return repackNv21(y.bytes, y.bytesPerRow, vu.bytes, vu.bytesPerRow, image.width, image.height);
+  final packed = repackNv21(y.bytes, y.bytesPerRow, vu.bytes, vu.bytesPerRow, image.width, image.height);
+  return (bytes: packed, bytesPerRow: image.width); // repackNv21 dolgusuz (stride==width) üretir
 }
