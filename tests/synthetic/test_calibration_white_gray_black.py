@@ -48,5 +48,28 @@ def test_white_gray_black_beats_white_black_on_nonlinear_camera_response():
     assert error_b < 2.0  # gama modeli tam eşleştiği için hata neredeyse sıfıra iner
 
 
+def test_white_gray_black_falls_back_to_linear_when_gray_reference_is_degenerate():
+    """GERÇEK BASILI ETİKET BULGUSU (22 Eylül, docs/decisions/0004): gri
+    referans yaması bazen QR'ın beyaz modülünden bile daha parlak ölçüldü
+    (`btaze1.jpeg`: white=(221,218,209), gray=(226,220,213)) — ham formülle
+    gama ~693000'e patlayıp görüntüyü neredeyse tamamen siyaha çöktürüyordu.
+    Artık böyle dejenere (güvenilmez) bir gri referansta B, o kanal için A
+    (white_black) ile TAMAMEN AYNI (gama=1) davranmalı — en kötü durumda
+    bile A'dan daha kötü bir sonuç üretmemeli."""
+    white_ref = (221, 218, 209)
+    black_ref = (31, 21, 11)
+    gray_ref = (226, 220, 213)  # beyazdan bile parlak -- dejenere
+    image = np.array([[[150, 150, 150], white_ref, black_ref]], dtype=np.uint8)
+    references = {"white": white_ref, "gray": gray_ref, "black": black_ref}
+
+    corrected_b = white_gray_black(image, references)
+    corrected_a = white_black(image, {"white": white_ref, "black": black_ref})
+
+    assert np.array_equal(corrected_b, corrected_a)
+    # Katastrofik (neredeyse siyah) çöküş YOK: orta-parlaklıktaki piksel
+    # hâlâ orta-yüksek kalmalı — kelepçesiz eski davranışta 0'a çökerdi.
+    assert corrected_b[0, 0].min() > 100
+
+
 def test_get_returns_white_gray_black_implementation():
     assert get("white_gray_black") is white_gray_black

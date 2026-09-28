@@ -43,6 +43,17 @@ def white_black(image: Image, references: dict) -> Image:
     return np.clip(corrected, 0, 255).astype(np.uint8)
 
 
+# white_gray_black(): gri referansın gama çözümü için "güvenilir" sayılacağı
+# normalize aralık (bkz. fonksiyonun kendi docstring'i ve docs/decisions/0004,
+# "22 Eylül" bulgusu). Gerçek basılı etiket verisi: norm_gray ~0.65 -> doğru
+# sınıflandırma (gama~1.5-1.8); norm_gray >= 0.925 -> hep yanlış/dejenere
+# gama (12'den 693000'e kadar). Sınır bilinçli olarak muhafazakar seçildi —
+# tam bir "doğru gama" eşiği değil, sadece dejenere uçları (gri ~ beyaz/siyah
+# ile ayırt edilemez ölçülmüş) filtreleyen bir güvenlik bandı.
+_MIN_RELIABLE_NORM_GRAY = 0.15
+_MAX_RELIABLE_NORM_GRAY = 0.85
+
+
 def white_gray_black(image: Image, references: dict) -> Image:
     """Beyaz + gri + siyah üç noktalı referans kalibrasyonu (rapor §6.1 B).
 
@@ -55,6 +66,19 @@ def white_gray_black(image: Image, references: dict) -> Image:
     tona (0.5) oturacak şekilde kanal başına bir GAMA (üs) çözülüp
     uygulanır — üç noktadan geçen bir eğri, iki noktadan geçen düz
     çizgiden orta tonlarda daha doğru olur.
+
+    GÜVENLİK KELEPÇESİ (28 Eylül, bkz. docs/decisions/0004 "22 Eylül"
+    bulgusu): gerçek baskıda gri yama bazen beyaza (hatta bazen ondan daha
+    parlak) çok yakın ölçülüyor — bu durumda ham formül gamayı patlatıyor
+    (gözlemlenen: ~693000), görüntüyü neredeyse tamamen siyaha çöken
+    dejenere bir eğriyle "düzeltiyor". Bu, YÖNTEMİN kendi varsayımının
+    (gri, beyazdan GÜVENİLİR biçimde daha koyu ölçülür) geçersiz kaldığı
+    bir durum — "daha az kötü ama hâlâ yanlış" bir gama tahmin etmeye
+    çalışmak yerine, güvenilmez (aşırı uçtaki) kanallarda gama=1 kullanılır,
+    yani o kanal için `white_black` (A) ile TAMAMEN AYNI doğrusal davranışa
+    düşülür. Böylece en kötü durumda bile B, gerçek baskıda en güvenilir
+    bulunan A'dan (bkz. karar dosyası) DAHA KÖTÜ bir sonuç üretemez — bu
+    B'nin kendi doğruluğunu artırmaz, sadece taban değerini A'ya sabitler.
     """
     white = np.asarray(references["white"], dtype=np.float64)
     black = np.asarray(references["black"], dtype=np.float64)
@@ -63,7 +87,8 @@ def white_gray_black(image: Image, references: dict) -> Image:
     span = np.where(span == 0, 1.0, span)
 
     normalized_gray = np.clip((gray - black) / span, 1e-6, 1 - 1e-6)
-    gamma = np.log(0.5) / np.log(normalized_gray)
+    reliable = (normalized_gray > _MIN_RELIABLE_NORM_GRAY) & (normalized_gray < _MAX_RELIABLE_NORM_GRAY)
+    gamma = np.where(reliable, np.log(0.5) / np.log(normalized_gray), 1.0)
 
     normalized = np.clip((image.astype(np.float64) - black) / span, 0.0, 1.0)
     corrected = np.power(normalized, gamma) * 255.0

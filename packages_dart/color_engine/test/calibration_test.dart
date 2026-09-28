@@ -66,6 +66,28 @@ void main() {
         expectRgb(out[i], expected[i], reason: 'pixel $i (${pixels[i]})');
       }
     });
+
+    test(
+        'GERÇEK BASILI ETİKET BULGUSU (28 Eylül, docs/decisions/0004): dejenere gri '
+        'referansta (beyazdan bile parlak) A ile TAMAMEN AYNI (gama=1) davranır, '
+        'katastrofik siyaha çöküş YOK', () {
+      // btaze1.jpeg'in ölçtüğü gerçek değerler (Python tarafında da aynı
+      // regresyon testi var, bkz. packages/color_engine/calibration.py).
+      const w = Rgb(221, 218, 209);
+      const b = Rgb(31, 21, 11);
+      const degenerateGray = Rgb(226, 220, 213); // beyazdan bile parlak
+      const midPixel = Rgb(150, 150, 150);
+
+      final outB = whiteGrayBlack([midPixel, w, b], white: w, gray: degenerateGray, black: b);
+      final outA = whiteBlack([midPixel, w, b], white: w, black: b);
+
+      for (var i = 0; i < 3; i++) {
+        expectRgb(outB[i], outA[i], reason: 'pixel $i: B, A ile aynı olmalı (gama=1 fallback)');
+      }
+      expect(outB[0].r, greaterThan(100), reason: 'kelepçesiz eski davranışta 0\'a çökerdi');
+      expect(outB[0].g, greaterThan(100));
+      expect(outB[0].b, greaterThan(100));
+    });
   });
 
   group('qrFixedRegions', () {

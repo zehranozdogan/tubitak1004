@@ -38,9 +38,27 @@ List<Rgb> whiteBlack(List<Rgb> pixels, {required Rgb white, required Rgb black})
       .toList();
 }
 
+// Gri referansın gama çözümü için "güvenilir" sayılacağı normalize aralık
+// (bkz. whiteGrayBlack ve docs/decisions/0004, "22 Eylül" bulgusu — bu
+// dosya packages/color_engine/calibration.py::white_gray_black'in BİREBİR
+// portu, 28 Eylül'de Python tarafında bulunan/düzeltilen aynı hata burada
+// da vardı). Gerçek basılı etiket verisi: norm_gray ~0.65 -> doğru
+// sınıflandırma (gama~1.5-1.8); norm_gray >= 0.925 -> hep yanlış/dejenere
+// gama (12'den 693000'e kadar). Sınır bilinçli olarak muhafazakar seçildi.
+const double _minReliableNormGray = 0.15;
+const double _maxReliableNormGray = 0.85;
+
 /// Beyaz + gri + siyah üç noktalı referans kalibrasyonu (rapor §6.1 B).
 /// A ile aynı uç-nokta normalizasyonu + gri referansın orta tona (0.5)
 /// oturacağı bir gama (üs) çözülüp uygulanır.
+///
+/// GÜVENLİK KELEPÇESİ (28 Eylül, bkz. yukarıdaki sabitler + docs/decisions/
+/// 0004): gerçek baskıda gri yama bazen beyaza (hatta ondan daha parlak)
+/// çok yakın ölçülüyor — ham formül gamayı patlatıp (gözlemlenen: ~693000)
+/// görüntüyü neredeyse tamamen siyaha çöktürüyordu. Güvenilmez (aşırı
+/// uçtaki) kanallarda artık gama=1 kullanılıyor — o kanal için `whiteBlack`
+/// (A) ile TAMAMEN AYNI doğrusal davranışa düşülüyor, yani B en kötü
+/// durumda bile A'dan daha kötü bir sonuç üretemez.
 List<Rgb> whiteGrayBlack(
   List<Rgb> pixels, {
   required Rgb white,
@@ -55,9 +73,14 @@ List<Rgb> whiteGrayBlack(
     return ((gray - black) / span).clamp(1e-6, 1 - 1e-6);
   }
 
-  final gammaR = math.log(0.5) / math.log(normalizedGray(gray.r, black.r, spanR));
-  final gammaG = math.log(0.5) / math.log(normalizedGray(gray.g, black.g, spanG));
-  final gammaB = math.log(0.5) / math.log(normalizedGray(gray.b, black.b, spanB));
+  double resolveGamma(double normalized) {
+    if (normalized <= _minReliableNormGray || normalized >= _maxReliableNormGray) return 1.0;
+    return math.log(0.5) / math.log(normalized);
+  }
+
+  final gammaR = resolveGamma(normalizedGray(gray.r, black.r, spanR));
+  final gammaG = resolveGamma(normalizedGray(gray.g, black.g, spanG));
+  final gammaB = resolveGamma(normalizedGray(gray.b, black.b, spanB));
 
   double correct(double c, double black, double span, double gamma) {
     final normalized = ((c - black) / span).clamp(0.0, 1.0);
