@@ -86,6 +86,40 @@ void main() {
     expect(bytes, isNotEmpty);
   });
 
+  test(
+      'populateReferenceRegions: hiç ÇİZMEDEN, renderLabelImage ile BİREBİR AYNI '
+      'reference_regions üretir (white_gray_black VE multicolor_patch)', () {
+    for (final code in const ['white_gray_black', 'multicolor_patch']) {
+      final qr = generateQr('payload-populate-$code', error: 'H');
+      final layoutViaRender = _sampleLayout(qr);
+      final layoutViaPopulate = _sampleLayout(qr);
+      final profile = {
+        'calibration_method': {'code': code},
+      };
+
+      renderLabelImage(qr, layoutViaRender, profile, state: null, scale: 10, border: 4);
+      populateReferenceRegions(qr, layoutViaPopulate, profile, border: 4);
+
+      expect(
+        layoutViaPopulate['reference_regions'],
+        equals(layoutViaRender['reference_regions']),
+        reason: 'code=$code',
+      );
+    }
+  });
+
+  test('populateReferenceRegions: white_black/A için hiçbir şey eklemez (ek yama gerekmiyor)', () {
+    final qr = generateQr('payload-populate-a', error: 'H');
+    final layout = _sampleLayout(qr);
+    final before = Map<String, dynamic>.from(layout['reference_regions'] as Map);
+
+    populateReferenceRegions(qr, layout, {
+      'calibration_method': {'code': 'white_black'},
+    });
+
+    expect(layout['reference_regions'], equals(before));
+  });
+
   test('syntheticStatesPngBytes: 3 durum da üretilir, hepsi geçerli PNG', () {
     final qr = generateQr('payload-states', error: 'H');
     final layout = _sampleLayout(qr);

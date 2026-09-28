@@ -47,6 +47,8 @@ Future<ScanOutcome> analyzePickedImagePath(String path, ReferenceData reference)
       final barcodes = await scanner.processImage(InputImage.fromFilePath(path));
       for (final barcode in barcodes) {
         final text = barcode.rawValue;
+        // Köşe sırası varsayımı DOĞRULANMAMIŞ — bkz. camera_scanner.dart
+        // aynı notun ayrıntısı (ML Kit native, kaynaktan doğrulanamıyor).
         final points = barcode.cornerPoints;
         if (barcode.format == BarcodeFormat.qrCode && text != null && points.length == 4) {
           qrText = text;

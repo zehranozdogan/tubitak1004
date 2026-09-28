@@ -164,6 +164,16 @@ class _CameraScannerState extends State<CameraScanner> {
             final barcodes = await _scanner.processImage(input);
             for (final barcode in barcodes) {
               final text = barcode.rawValue;
+              // DOĞRULANMAMIŞ VARSAYIM (28 Eylül, bkz. proje notu): ML Kit'in
+              // `cornerPoints`'inin sol-üst, sağ-üst, sağ-alt, sol-alt (saat
+              // yönünde) sırasında olduğu varsayılıyor —
+              // `color_engine.canonicalQrCorners`'ın beklediği AYNI sıra.
+              // Google'ın ML Kit `Barcode.getCornerPoints()` dokümantasyonu
+              // bunu böyle tanımlıyor, ama native (Android/iOS) tarafta
+              // olduğu için bu repoda KAYNAKTAN doğrulanamıyor/test edilemiyor
+              // — gerçek cihazda yanlış/döndürülmüş bir homografi görülürse
+              // (ör. renk örnekleme sistematik olarak yanlış köşeden yapılıyor
+              // gibi görünürse) BURASI ilk şüpheli.
               final points = barcode.cornerPoints;
               if (barcode.format != BarcodeFormat.qrCode || text == null || points.length != 4) continue;
 

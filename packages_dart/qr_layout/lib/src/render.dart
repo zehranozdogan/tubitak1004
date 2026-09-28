@@ -18,6 +18,7 @@
 import 'package:image/image.dart' as img;
 
 import 'colors.dart';
+import 'function_mask.dart' show matrixSize;
 import 'generator.dart';
 import 'reactive.dart' show Cell;
 
@@ -152,6 +153,44 @@ img.Image renderColoredImage(
 
 const String _needsGrayPatch = 'white_gray_black';
 const String _needsMulticolorPatch = 'multicolor_patch';
+
+/// `renderLabelImage` ile AYNI `layout['reference_regions']` güncellemesini
+/// yapar ama HİÇ ÇİZMEZ (28 Eylül eklendi) — `sensorProfile['calibration_
+/// method']['code']`'a göre ihtiyaç varsa `edgeGrayPatchPosition`/
+/// `edgePatchPositions` (ucuz, saf pozisyon hesabı) çağrılır, tam bir
+/// piksel tamponu (renderColoredImage) ASLA oluşturulmaz.
+///
+/// KULLANIM ALANI: `label_export::resolveLabelLayout` (okuyucunun
+/// layout'u payload'dan yeniden türettiği yol, karar 0006) sadece BU
+/// pozisyon bilgisine ihtiyaç duyuyordu ama önceden tüm etiketi render
+/// edip SONUCU ATIYORDU — her taramada (kamera/dosya/fotoğraf) gereksiz
+/// bir tam-çözünürlük render'a yol açıyordu, eski/zayıf cihazlarda
+/// fark edilir bir gecikme kaynağı olabilir. `matrixSize(qr.version)`
+/// kullanılıyor (`moduleMatrix(qr).length` DEĞİL) — tam modül matrisini
+/// üretmek de gereksiz, versiyon zaten boyutu belirliyor.
+void populateReferenceRegions(GeneratedQr qr, Map<String, dynamic> layout, Map<String, dynamic>? sensorProfile, {int border = 4}) {
+  final code = ((sensorProfile?['calibration_method'] as Map<String, dynamic>?)?['code'] as String?) ?? 'white_black';
+  if (code != _needsGrayPatch && code != _needsMulticolorPatch) return;
+
+  final n = matrixSize(qr.version);
+  final refs = (layout['reference_regions'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+  layout['reference_regions'] = refs;
+
+  if (code == _needsGrayPatch) {
+    final pos = edgeGrayPatchPosition(n, border: border);
+    refs['gray'] = [
+      [pos.row, pos.col],
+    ];
+    return;
+  }
+
+  final positions = edgePatchPositions(n, border: border);
+  for (final entry in positions.entries) {
+    refs[entry.key] = [
+      [entry.value.row, entry.value.col],
+    ];
+  }
+}
 
 /// `sensorProfile['calibration_method']['code']`'a göre doğru render
 /// yolunu seçer (rapor §6.1 A-E) VE gerekliyse

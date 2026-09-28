@@ -173,22 +173,32 @@ GeneratedLabel generateLabel(schema.LabelPayload payload, {String density = 'low
 
 /// OKUYUCU tarafı için: bir etiketin layout'unu (reaktif hücre konumları,
 /// referans bölgeleri) `payload`'dan YENİDEN türetir — admin'in etiketi
-/// basarken kullandığı `generateLabel` + `renderLabelImage` ile AYNI adımlar
-/// (render, kalibrasyon yöntemi B/C ise `reference_regions`'a kenar
-/// yamalarının konumunu yazar; görüntü atılır, sadece bu yan etki gerekli).
+/// basarken kullandığı `generateLabel` + `renderLabelImage`'ın kullandığı
+/// AYNI pozisyon mantığı (kalibrasyon yöntemi B/C ise `reference_regions`'a
+/// kenar yamalarının konumunu yazar).
 ///
 /// Neden var: karar 0005 (statik/paketli veri) tek başına yetmiyor — QR
 /// boyutu payload uzunluğuna göre değiştiği için sabit bir layout dosyası
 /// gerçek etiketlerle uyuşmaz. Bunun yerine paketli veri sadece "tarif"
 /// (yoğunluk) tutar, hücreler `layout_version` seed'iyle her iki tarafta
 /// AYNI Dart algoritmasıyla türetilir (bkz. apps/freshqr README, 24 Eylül).
+///
+/// GERÇEK CİHAZ PERFORMANSI (28 Eylül): önceden bunun için TÜM etiket
+/// `renderLabelImage` ile GERÇEKTEN çizilip sonuç ATILIYORDU — her
+/// taramada (bu fonksiyon `apps/freshqr/lib/services/scan_service.dart`
+/// içinde her başarılı yakalamada bir kez çağrılıyor) gereksiz bir tam-
+/// çözünürlük piksel tamponu oluşturuluyordu. Artık `qr_layout.
+/// populateReferenceRegions` kullanılıyor — AYNI pozisyon hesabını yapar
+/// (`edgeGrayPatchPosition`/`edgePatchPositions`, saf/ucuz fonksiyonlar)
+/// ama HİÇ ÇİZMEZ; eski/zayıf cihazlarda (bkz. proje notu) her taramaya
+/// eklenen gereksiz gecikmeyi ortadan kaldırır.
 GeneratedLabel resolveLabelLayout(
   schema.LabelPayload payload, {
   String density = 'low',
   Map<String, dynamic>? sensorProfile,
 }) {
   final generated = generateLabel(payload, density: density);
-  qr_layout.renderLabelImage(generated.qr, generated.layoutJson, sensorProfile, state: null);
+  qr_layout.populateReferenceRegions(generated.qr, generated.layoutJson, sensorProfile);
   final layout = schema.LayoutVersionData.fromJson(generated.layoutJson);
   return GeneratedLabel(payload: payload, qr: generated.qr, layout: layout, layoutJson: generated.layoutJson);
 }
