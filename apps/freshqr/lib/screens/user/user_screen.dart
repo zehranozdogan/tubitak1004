@@ -157,7 +157,12 @@ class _UserScreenState extends State<UserScreen> {
     switch (outcome) {
       case ScanSuccess(:final result, :final labelInfo):
         await _record(result, labelInfo);
-        _runScan(result, labelInfo, capture.corners != null ? 'ML Kit' : 'zxing2 (yedek)');
+        final decoderNote = capture.corners != null
+            ? 'ML Kit'
+            : capture.mlKitError != null
+                ? 'zxing2 (yedek) — ML Kit çöktü: ${capture.mlKitError}'
+                : 'zxing2 (yedek)';
+        _runScan(result, labelInfo, decoderNote);
       case ScanInvalidQr(:final reason):
         _showInvalidQr(reason);
     }

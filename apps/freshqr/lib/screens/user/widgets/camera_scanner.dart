@@ -56,9 +56,18 @@ class CameraCapture {
   // `analyzeCapturedLabel` içinde, matrixSize bilinince kestirilir).
   final List<List<double>>? corners;
   final QrFinderPoints? finderPoints;
+  // ML Kit bu karede çöktüyse (bkz. _onFrame) GERÇEK hata metni — teşhis
+  // için: önceden yutuluyordu (`catch (_)`), "hiç çalışmadı" ötesinde bir
+  // bilgi edinilemiyordu. corners doluysa (ML Kit başarılıysa) hep null.
+  final String? mlKitError;
 
-  const CameraCapture({required this.qrText, required this.image, this.corners, this.finderPoints})
-      : assert((corners == null) != (finderPoints == null), 'corners ile finderPoints\'ten tam olarak biri verilmeli');
+  const CameraCapture({
+    required this.qrText,
+    required this.image,
+    this.corners,
+    this.finderPoints,
+    this.mlKitError,
+  }) : assert((corners == null) != (finderPoints == null), 'corners ile finderPoints\'ten tam olarak biri verilmeli');
 }
 
 class CameraScanner extends StatefulWidget {
@@ -88,6 +97,9 @@ class _CameraScannerState extends State<CameraScanner> {
   // cihaz testi) bir kere işaretlenir; sonraki karelerde ML Kit'i HİÇ
   // denemeden doğrudan zxing2'ye geçilir (gereksiz gecikme/tekrar çökme yok).
   bool _mlKitBroken = false;
+  // GERÇEK hata metni (28 Eylül eklendi) — önceden `catch (_)` ile tamamen
+  // yutuluyordu, "NullPointerException" ötesinde teşhis bilgisi yoktu.
+  String? _mlKitError;
   bool _busy = false;
   bool _done = false;
 
@@ -167,18 +179,28 @@ class _CameraScannerState extends State<CameraScanner> {
             _mlKitFailureStreak++;
             if (_mlKitFailureStreak < _fallbackAfterFailures) return;
           }
-        } catch (_) {
+        } catch (e, st) {
           // ML Kit bu cihazda GERÇEKTEN çalışmıyor (dosya başlığındaki
           // gerçek-cihaz notuna bkz.) — beklemeden zxing2'ye geç, sonraki
-          // karelerde ML Kit'i hiç denemeyelim.
+          // karelerde ML Kit'i hiç denemeyelim. Hatayı ARTIK yutmuyoruz:
+          // hem terminale/logcat'e (debugPrint) hem de _finish üzerinden
+          // sonuç ekranındaki "Okuyucu" satırına taşınıyor (bkz. o dosya).
           _mlKitBroken = true;
+          _mlKitError = e.toString();
+          debugPrint('ML Kit processImage çöktü, zxing2\'ye geçiliyor: $e\n$st');
         }
       }
 
       final rgbForZxing = _frameToRgb(image, rotation);
       final zx = decodeQrZxing(rgbToImgImage(rgbForZxing));
       if (zx != null && zx.finderPoints != null) {
-        await _finish(controller, qrText: zx.text, rgb: rgbForZxing, finderPoints: zx.finderPoints);
+        await _finish(
+          controller,
+          qrText: zx.text,
+          rgb: rgbForZxing,
+          finderPoints: zx.finderPoints,
+          mlKitError: _mlKitError,
+        );
       }
     } catch (e) {
       if (!_done && mounted) {
@@ -210,11 +232,18 @@ class _CameraScannerState extends State<CameraScanner> {
     required RgbImage rgb,
     List<List<double>>? corners,
     QrFinderPoints? finderPoints,
+    String? mlKitError,
   }) async {
     _done = true;
     await controller.stopImageStream();
     if (!mounted) return;
-    widget.onCapture(CameraCapture(qrText: qrText, image: rgb, corners: corners, finderPoints: finderPoints));
+    widget.onCapture(CameraCapture(
+      qrText: qrText,
+      image: rgb,
+      corners: corners,
+      finderPoints: finderPoints,
+      mlKitError: mlKitError,
+    ));
   }
 
   @override
