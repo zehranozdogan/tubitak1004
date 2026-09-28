@@ -56,9 +56,20 @@ distance transform, safety score, crc32) ise gerçek Python ile BİREBİR.
   Android/iOS'a özel) YEDEĞİ olarak kullanılıyor (rapor §11: "en az iki
   decoder"). `decodeQrZxing` + `estimateOuterCorners` (finder pattern
   merkezlerinden gerçek dış köşe kestirimi — DOĞRULAMA ve SINIRLAR için
-  dosyanın kendi başlığına bkz., eksen-hizalı sentetik testte TAM eşleşiyor,
-  gerçek kamera perspektifinde henüz doğrulanmadı). 24 etikette (3
-  durum × 8 parti no) temiz görüntüde 36/36 çözüldü.
+  dosyanın kendi başlığına bkz.). 24 etikette (3 durum × 8 parti no) temiz
+  görüntüde 36/36 çözüldü.
+
+  **Köşe kestirimi artık HOMOGRAFİ tabanlı (28 Eylül):** önceden sadece
+  3 finder noktasından AFİN extrapolasyon yapılıyordu (gerçek perspektifte
+  doğrulanmamış bir mimari sapma olarak işaretliydi). zxing2'nin QR
+  versiyon >= 2'de verdiği 4. (hizalama deseni) noktası kullanılarak artık
+  GERÇEK bir projektif dönüşüm (`perspective_transform.dart` — zxing2'nin
+  KENDİ `PerspectiveTransform`'unun birebir portu) kuruluyor; sadece
+  hizalama deseni yoksa (versiyon 1 ya da bulunamadıysa) eski afin yedeğe
+  düşülüyor. Sentetik perspektif testinde (bkz. `decode_test.dart` "GERÇEK
+  PERSPEKTİF ALTINDA") homografi hatası alt-piksel kalırken afin en uzak
+  köşede ~80 kat daha kötü — perspektifin afinle TAM temsil edilemediğinin
+  somut kanıtı.
 
   **GERÇEK CİHAZ HATASI (25 Eylül) — bulundu ve düzeltildi:** telefonla
   çekilmiş basılı bir etiket fotoğrafı hep "bulunamadı" veriyordu.

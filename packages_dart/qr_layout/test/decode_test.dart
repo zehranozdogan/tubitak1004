@@ -1,8 +1,11 @@
 // decode.dart testleri — bkz. lib/src/decode.dart dosya başlığı (seçim
 // gerekçesi, köşe kestirim formülünün kaynağı ve sınırları).
 
+import 'dart:math' as math;
+
 import 'package:image/image.dart' as img;
 import 'package:qr_layout/qr_layout.dart';
+import 'package:qr_layout/src/perspective_transform.dart';
 import 'package:test/test.dart';
 import 'package:zxing2/qrcode.dart' as zx;
 
@@ -22,6 +25,74 @@ img.Image _withGradientShadow(img.Image src, double darkFactor) {
     }
   }
   return out;
+}
+
+/// Temiz (eksen-hizalı) bir etiket görüntüsünü GERÇEK bir projektif
+/// dönüşümle (homografi) daha büyük bir "fotoğraf" tuvaline çarpıtır —
+/// GERÇEK kamera açısını (yamuk/trapezoid, saf afin DEĞİL: kenarlar
+/// paralel kalmıyor) simüle eder. `PerspectiveTransform`'un kendisini
+/// kullanır (decode.dart'taki `estimateOuterCorners`'ın homografi dalıyla
+/// AYNI sınıf) — ters (hedef -> kaynak) dönüşüm hesaplanıp her tuval
+/// pikseli için en-yakın-komşu örnekleme yapılır.
+({img.Image warped, List<List<double>> trueCorners}) _withPerspectiveWarp(
+  img.Image clean, {
+  required List<double> destTopLeft,
+  required List<double> destTopRight,
+  required List<double> destBottomRight,
+  required List<double> destBottomLeft,
+  required int canvasWidth,
+  required int canvasHeight,
+}) {
+  final w = clean.width.toDouble();
+  final h = clean.height.toDouble();
+
+  final inverse = PerspectiveTransform.quadrilateralToQuadrilateral(
+    destTopLeft[0], destTopLeft[1], destTopRight[0], destTopRight[1], //
+    destBottomRight[0], destBottomRight[1], destBottomLeft[0], destBottomLeft[1], //
+    0, 0, w, 0, w, h, 0, h,
+  );
+
+  final forward = PerspectiveTransform.quadrilateralToQuadrilateral(
+    0, 0, w, 0, w, h, 0, h, //
+    destTopLeft[0], destTopLeft[1], destTopRight[0], destTopRight[1], //
+    destBottomRight[0], destBottomRight[1], destBottomLeft[0], destBottomLeft[1],
+  );
+  // DİKKAT: "gerçek dış köşe" QR MATRİSİNİN kendi sınırı (modül 0,0..n,n),
+  // temiz görüntünün TÜM piksel alanı DEĞİL — clean image'da `_border`
+  // modül kadar sessiz bölge (quiet zone) var (bkz. mevcut eksen-hizalı
+  // testteki "truth" tablosu, AYNI ofset). Bunu unutmak (temiz görüntünün
+  // ham (0,0)-(w,h) sınırını kullanmak) devasa, yanıltıcı bir "hata"
+  // üretiyordu — ilk yazımda böyle bir hataya düşüldü, elle izole edilip
+  // düzeltildi (bkz. sohbet geçmişi, 28 Eylül).
+  final b = (_border * _scale).toDouble();
+  final nb = w - b;
+  final trueCornersFlat = [b, b, nb, b, nb, nb, b, nb];
+  forward.transformPoints(trueCornersFlat);
+  final trueCorners = [
+    [trueCornersFlat[0], trueCornersFlat[1]],
+    [trueCornersFlat[2], trueCornersFlat[3]],
+    [trueCornersFlat[4], trueCornersFlat[5]],
+    [trueCornersFlat[6], trueCornersFlat[7]],
+  ];
+
+  final out = img.Image(width: canvasWidth, height: canvasHeight, numChannels: 3);
+  img.fill(out, color: img.ColorRgb8(255, 255, 255));
+  for (var y = 0; y < canvasHeight; y++) {
+    for (var x = 0; x < canvasWidth; x++) {
+      final srcPoint = [x.toDouble(), y.toDouble()];
+      inverse.transformPoints(srcPoint);
+      final sx = srcPoint[0].round(), sy = srcPoint[1].round();
+      if (sx >= 0 && sx < clean.width && sy >= 0 && sy < clean.height) {
+        out.setPixel(x, y, clean.getPixel(sx, sy));
+      }
+    }
+  }
+  return (warped: out, trueCorners: trueCorners);
+}
+
+double _dist(List<double> a, List<double> b) {
+  final dx = a[0] - b[0], dy = a[1] - b[1];
+  return math.sqrt(dx * dx + dy * dy);
 }
 
 bool _decodeWithGlobalHistogramOnly(img.Image image) {
@@ -114,6 +185,90 @@ void main() {
   });
 
   group('estimateOuterCorners', () {
+    test(
+        'GERÇEK PERSPEKTİF ALTINDA (28 Eylül): homografi (4. hizalama noktası) '
+        'köşe hatasını eski 3-noktalı afin kestirimden BELİRGİN ÖLÇÜDE azaltır', () {
+      final clean = _renderReal();
+      // Simetrik olmayan yamuk (saf afin bir dönüşümle temsil EDİLEMEZ —
+      // afin paralelkenarı paralelkenara götürür, bu dörtgen paralelkenar
+      // DEĞİL) — gerçek kamera açısını taklit eder.
+      final warp = _withPerspectiveWarp(
+        clean,
+        // Makul bir kamera açısı (elde tutulan telefon, hafif eğik) --
+        // saf afin ile temsil EDİLEMEYEN gerçek bir yamuk.
+        destTopLeft: [60, 60],
+        destTopRight: [790, 90],
+        destBottomRight: [770, 800],
+        destBottomLeft: [80, 810],
+        canvasWidth: 850,
+        canvasHeight: 870,
+      );
+
+      final result = decodeQrZxing(warp.warped);
+      expect(result, isNotNull, reason: 'bu ölçüdeki perspektifte zxing2 hâlâ çözebilmeli');
+      final finderPoints = result!.finderPoints;
+      expect(finderPoints, isNotNull);
+      expect(finderPoints!.alignment, isNotNull, reason: 'versiyon 12 -> hizalama deseni olmalı');
+
+      final viaHomography = estimateOuterCorners(finderPoints, _matrixSize);
+      final viaAffineOnly = estimateOuterCorners(
+        QrFinderPoints(topLeft: finderPoints.topLeft, topRight: finderPoints.topRight, bottomLeft: finderPoints.bottomLeft),
+        _matrixSize,
+      );
+
+      double maxError(List<List<double>> estimated) {
+        var maxErr = 0.0;
+        for (var i = 0; i < 4; i++) {
+          final err = _dist(estimated[i], warp.trueCorners[i]);
+          if (err > maxErr) maxErr = err;
+        }
+        return maxErr;
+      }
+
+      final errorHomography = maxError(viaHomography);
+      final errorAffineOnly = maxError(viaAffineOnly);
+
+      // Ölçülen gerçek değerler (28 Eylül): homografi alt-piksel (~<1px,
+      // zxing2'nin KENDİ finder tespiti kadar doğru), afin en uzak köşede
+      // (finder noktalarından extrapolasyonun perspektifte saptığı nokta)
+      // ~42px hata veriyor -- ~80 kat fark. Payla (10x) flaky olmayan ama
+      // hâlâ "belirgin ölçüde daha iyi" iddiasını kanıtlayan bir eşik.
+      expect(errorHomography, lessThan(2.0), reason: 'homografi hatası: $errorHomography px');
+      expect(errorAffineOnly, greaterThan(errorHomography * 10), reason: 'afin: $errorAffineOnly px, homografi: $errorHomography px');
+    });
+
+    test('BİLİNEN bir homografiden üretilen finder+hizalama noktalarında formül KESİN doğru (analitik referans)', () {
+      // _estimateOuterCornersViaHomography'nin matematiğini, gerçek zxing2
+      // tespit gürültüsünden BAĞIMSIZ olarak izole doğrular: kurgusal ama
+      // BİLİNEN bir projektif dönüşüm seçilir, finder/hizalama noktaları bu
+      // dönüşümden TÜRETİLİR (gerçek zxing2'den değil) -- yani "gerçek dış
+      // köşe" de AYNI dönüşümden hesaplanabilir ve tam eşleşme beklenir.
+      const n = 65.0;
+      final dimMinusThree = n - 3.5;
+      final knownTransform = PerspectiveTransform.quadrilateralToQuadrilateral(
+        0, 0, n, 0, n, n, 0, n, //
+        90, 80, 980, 140, 920, 760, 140, 820,
+      );
+      ({double x, double y}) at(double mx, double my) {
+        final p = [mx, my];
+        knownTransform.transformPoints(p);
+        return (x: p[0], y: p[1]);
+      }
+
+      final points = QrFinderPoints(
+        topLeft: at(3.5, 3.5),
+        topRight: at(dimMinusThree, 3.5),
+        bottomLeft: at(3.5, dimMinusThree),
+        alignment: at(n - 6.5, n - 6.5),
+      );
+      final estimated = estimateOuterCorners(points, 65);
+      final truth = [at(0, 0), at(n, 0), at(n, n), at(0, n)];
+      for (var i = 0; i < 4; i++) {
+        expect(estimated[i][0], closeTo(truth[i].x, 1e-6), reason: 'köşe $i x');
+        expect(estimated[i][1], closeTo(truth[i].y, 1e-6), reason: 'köşe $i y');
+      }
+    });
+
     test('gerçek zxing2 çıktısından kestirilen köşeler, eksen-hizalı (perspektifsiz) etikette GERÇEK köşelerle TAM eşleşir', () {
       final image = _renderReal();
       final result = decodeQrZxing(image)!;

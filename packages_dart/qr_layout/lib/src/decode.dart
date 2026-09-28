@@ -13,35 +13,61 @@
 // (pyzbar/cv2'nin Python tarafında gösterdiğiyle aynı örüntü) — bkz.
 // test/decode_test.dart.
 //
-// KÖŞE KESTİRİMİ (estimateOuterCorners) — MİMARİ SAPMA, KISMEN
-// DOĞRULANMAMIŞ: zxing2'nin `Result.resultPoints`'i QR'ın GERÇEK dış
-// köşelerini DEĞİL, finder pattern MERKEZLERİNİ verir (ZXing'in Java
-// kaynağıyla aynı davranış, zxing2/lib/src/qrcode/detector/detector.dart
-// elle okunarak doğrulandı: `points = [bottomLeft, topLeft, topRight]`).
-// Gerçek dış köşe, her finder merkezinden `matrixSize` cinsinden 3.5 modül
-// içeride — bu yüzden `matrixSize` bilinmeden köşe hesaplanamaz (ki
-// `matrixSize` de ancak metin ÇÖZÜLDÜKTEN ve payload'daki layout_version
-// üzerinden `label_export.resolveLabelLayout` çağrıldıktan SONRA bilinir
-// — bkz. çağıran taraf, apps/freshqr/lib/services/scan_service.dart).
-// Formül (moduleVector = (finder_merkezi_farkı) / (matrixSize - 7), gerçek
-// köşe = topLeft_merkezi - 3.5*moduleVector) zxing2'nin KENDİ iç
-// `modulesBetweenFPCenters = dimensionForVersion - 7` ilişkisiyle BİREBİR
-// aynı — elle doğrulandı. EKSEN-HİZALI (perspektif YOK) sentetik testte
-// TAM eşleşiyor (bkz. test/decode_test.dart). GERÇEK KAMERA AÇISI/
-// PERSPEKTİFİ ALTINDA DOĞRULANMADI — bu extrapolasyon sadece AFİN
-// (döndürme/öteleme/hafif eğiklik) durumda kesin doğru; güçlü perspektif
-// altında (ML Kit'in doğrudan verdiği 4 köşeye göre) bir miktar hata
-// payı olabilir. Cihaz testinde doğrulanacak (bkz. proje hatırlatma notu).
+// KÖŞE KESTİRİMİ (estimateOuterCorners) — MİMARİ SAPMA: zxing2'nin
+// `Result.resultPoints`'i QR'ın GERÇEK dış köşelerini DEĞİL, finder
+// pattern MERKEZLERİNİ (+ opsiyonel 4. hizalama deseni merkezini) verir
+// (ZXing'in Java kaynağıyla aynı davranış, detector.dart elle okunarak
+// doğrulandı). Gerçek dış köşe, her finder merkezinden `matrixSize`
+// cinsinden 3.5 modül içeride — bu yüzden `matrixSize` bilinmeden köşe
+// hesaplanamaz (ki `matrixSize` de ancak metin ÇÖZÜLDÜKTEN ve payload'daki
+// layout_version üzerinden `label_export.resolveLabelLayout` çağrıldıktan
+// SONRA bilinir — bkz. çağıran taraf, apps/freshqr/lib/services/
+// scan_service.dart).
+//
+// İKİ YÖNTEM (28 Eylül, `points.alignment` varsa/yoksa dallanır):
+// - HOMOGRAFİ (`_estimateOuterCornersViaHomography`, tercih edilen):
+//   4. (hizalama deseni) nokta varsa GERÇEK bir projektif dönüşüm kurulur
+//   — zxing2'nin KENDİ `Detector._createTransform`/`PerspectiveTransform`
+//   matematiğinin BİREBİR portu (bkz. perspective_transform.dart başlığı),
+//   TÜM ızgarayı örneklemek için zxing2'nin GERÇEKTEN kullandığı/güvendiği
+//   aynı dönüşüm. BİLİNEN bir homografiden üretilen sentetik noktalarda
+//   analitik olarak KESİN doğru (alt-piksel), GERÇEK (sentetik) perspektif
+//   altında da afin kestirimden ÖLÇÜLEBİLİR ÖLÇÜDE (~80 kat, en uzak
+//   köşede) daha doğru (bkz. test/decode_test.dart "GERÇEK PERSPEKTİF
+//   ALTINDA").
+// - AFİN (`_estimateOuterCornersAffine`, yedek): sadece 3 nokta varsa
+//   (versiyon 1 — hizalama deseni yok — ya da desen bulunamadıysa).
+//   Formül (moduleVector = (finder_merkezi_farkı) / (matrixSize - 7),
+//   gerçek köşe = topLeft_merkezi - 3.5*moduleVector) zxing2'nin KENDİ iç
+//   `modulesBetweenFPCenters = dimensionForVersion - 7` ilişkisiyle
+//   BİREBİR aynı — elle doğrulandı. EKSEN-HİZALI (perspektif YOK) sentetik
+//   testte TAM eşleşiyor. GERÇEK KAMERA AÇISI/PERSPEKTİFİ ALTINDA sadece
+//   AFİN (döndürme/öteleme/hafif eğiklik) durumda kesin doğru — güçlü
+//   perspektifte bir miktar hata payı olabilir (bu yüzden versiyon >= 2'de
+//   artık HOMOGRAFİ tercih ediliyor, bu yedek sadece hizalama deseni
+//   bulunamadığında devreye girer).
 
 import 'package:image/image.dart' as img;
 import 'package:zxing2/qrcode.dart' as zx;
+
+import 'perspective_transform.dart';
 
 class QrFinderPoints {
   final ({double x, double y}) topLeft;
   final ({double x, double y}) topRight;
   final ({double x, double y}) bottomLeft;
+  // zxing2'nin opsiyonel 4. noktası (hizalama deseni merkezi, QR versiyon
+  // >= 2'de genelde mevcut) — varsa `estimateOuterCorners` GERÇEK bir
+  // projektif dönüşüm (homografi) kurar; yoksa (versiyon 1 ya da desen
+  // bulunamadıysa) eski 3-noktalı afin kestirime düşer (bkz. o fonksiyon).
+  final ({double x, double y})? alignment;
 
-  const QrFinderPoints({required this.topLeft, required this.topRight, required this.bottomLeft});
+  const QrFinderPoints({
+    required this.topLeft,
+    required this.topRight,
+    required this.bottomLeft,
+    this.alignment,
+  });
 }
 
 class ZxingDecodeResult {
@@ -87,23 +113,77 @@ ZxingDecodeResult? decodeQrZxing(img.Image image) {
   QrFinderPoints? finderPoints;
   if (pts.length >= 3) {
     // Sıra zxing2'nin KENDİ Detector.detect()'inde sabit: [bottomLeft,
-    // topLeft, topRight] (+ opsiyonel 4. hizalama noktası, burada kullanılmıyor).
+    // topLeft, topRight, (opsiyonel) hizalama deseni] — bkz.
+    // zxing2/lib/src/qrcode/detector/detector.dart processFinderPatternInfo,
+    // elle okunarak doğrulandı.
     finderPoints = QrFinderPoints(
       bottomLeft: (x: pts[0].x, y: pts[0].y),
       topLeft: (x: pts[1].x, y: pts[1].y),
       topRight: (x: pts[2].x, y: pts[2].y),
+      alignment: pts.length >= 4 ? (x: pts[3].x, y: pts[3].y) : null,
     );
   }
   return ZxingDecodeResult(result.text, finderPoints);
 }
 
-/// Finder pattern merkezlerinden QR'ın GERÇEK dış köşelerini kestirir —
-/// bkz. dosya başlığı notu. Dönen sıra `color_engine.analyzeFrame`'in
-/// beklediğiyle AYNI: sol-üst, sağ-üst, sağ-alt, sol-alt.
+/// Finder pattern merkezlerinden (+ varsa hizalama deseninden) QR'ın
+/// GERÇEK dış köşelerini kestirir — bkz. dosya başlığı notu. Dönen sıra
+/// `color_engine.analyzeFrame`'in beklediğiyle AYNI: sol-üst, sağ-üst,
+/// sağ-alt, sol-alt.
+///
+/// `points.alignment` DOLUYSA (bkz. QrFinderPoints, genelde QR versiyon
+/// >= 2'de mevcut) GERÇEK bir projektif dönüşüm (homografi, 28 Eylül
+/// eklendi — bkz. perspective_transform.dart başlığı) kullanılır; bu,
+/// gerçek kamera perspektifi/açısı altında saf afin kestirimden DAHA
+/// DOĞRU olması beklenir (afin sadece 3 nokta ile kurulabiliyordu,
+/// perspektif projeksiyonu tam temsil edemez — bkz. dosya başlığındaki
+/// eski not). BOŞSA (versiyon 1 ya da desen bulunamadı) eski 3-noktalı
+/// afin kestirime düşülür — o formülün doğrulama/sınırları için aşağıdaki
+/// `_estimateOuterCornersAffine`'e bkz.
 List<List<double>> estimateOuterCorners(QrFinderPoints points, int matrixSize) {
   if (matrixSize <= 7) {
     throw ArgumentError('matrixSize (verilen: $matrixSize) finder pattern\'lardan (7 modül) büyük olmalı.');
   }
+  final alignment = points.alignment;
+  if (alignment != null) {
+    return _estimateOuterCornersViaHomography(points, alignment, matrixSize);
+  }
+  return _estimateOuterCornersAffine(points, matrixSize);
+}
+
+/// GERÇEK projektif dönüşüm — bkz. estimateOuterCorners. Kaynak (modül-
+/// uzayı) ve hedef (piksel-uzayı) dörtgenleri zxing2'nin KENDİ
+/// `Detector._createTransform`'uyla BİREBİR aynı kurulur (elle okunarak
+/// doğrulandı, bkz. perspective_transform.dart başlığı): hizalama
+/// deseninin modül-uzayı konumu `matrixSize - 6.5` (zxing2'nin TÜM
+/// ızgarayı örneklemek için fiilen kullandığı değer — gerçek decode
+/// başarılı olduğunda bu değerin doğruluğu zaten kanıtlanmış oluyor,
+/// checksum/Reed-Solomon geçmemiş olurdu).
+List<List<double>> _estimateOuterCornersViaHomography(
+  QrFinderPoints points,
+  ({double x, double y}) alignment,
+  int matrixSize,
+) {
+  final n = matrixSize.toDouble();
+  final dimMinusThree = n - 3.5;
+  final transform = PerspectiveTransform.quadrilateralToQuadrilateral(
+    3.5, 3.5, dimMinusThree, 3.5, n - 6.5, n - 6.5, 3.5, dimMinusThree, //
+    points.topLeft.x, points.topLeft.y, //
+    points.topRight.x, points.topRight.y, //
+    alignment.x, alignment.y, //
+    points.bottomLeft.x, points.bottomLeft.y,
+  );
+  final corners = [0.0, 0.0, n, 0.0, n, n, 0.0, n];
+  transform.transformPoints(corners);
+  return [
+    [corners[0], corners[1]],
+    [corners[2], corners[3]],
+    [corners[4], corners[5]],
+    [corners[6], corners[7]],
+  ];
+}
+
+List<List<double>> _estimateOuterCornersAffine(QrFinderPoints points, int matrixSize) {
   final n = matrixSize.toDouble();
   final modulesBetweenCenters = n - 7;
 
