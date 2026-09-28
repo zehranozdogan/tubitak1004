@@ -117,6 +117,15 @@ void main() {
       // hızlandırmalı, farklı algoritma), bu yüzden ML Kit birincil decoder
       // olarak kalmalı; bu test sadece zxing2 YEDEĞİNİN kendi sınırını
       // belgeliyor.
+      //
+      // DENENDİ, İŞE YARAMADI (28 Eylül): radius=8-9 sınırında basit bir
+      // keskinleştirme (unsharp mask, 3x3 kernel) ön-işleme denendi --
+      // tek geçişte HİÇ fark etmedi, tekrarlı geçişte (6x) DAHA DA
+      // KÖTÜLEŞTİ (gürültü/ringing artefaktları binarizasyonu bozdu).
+      // Küçük bir yerel filtrenin, geniş bir kutu-bulanıklığını (radius=9
+      // -> 19 piksel pencere) tersine çevirmesi zaten beklenmiyordu --
+      // tekrar denenmemeli, daha büyük bir çözüm (ör. gerçek deconvolution)
+      // gerekirdi ki bu bu paketin kapsamı dışında.
       final clean = await renderLabel('fresh');
       final scores = <double>[];
       for (final radius in [0, 1, 2, 3]) {
