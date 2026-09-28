@@ -95,6 +95,47 @@ def white_gray_black(image: Image, references: dict) -> Image:
     return np.clip(corrected, 0, 255).astype(np.uint8)
 
 
+def _multicolor_patch_fit(references: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    captured = np.asarray(references["captured"], dtype=np.float64)
+    true = np.asarray(references["true"], dtype=np.float64)
+    if captured.shape[0] < 4:
+        raise ValueError("multicolor_patch en az 4 referans noktası gerektirir (3x4 afin çözüm için).")
+
+    design = np.hstack([captured, np.ones((captured.shape[0], 1))])
+    matrix, *_ = np.linalg.lstsq(design, true, rcond=None)  # (4,3)
+    return design, true, matrix
+
+
+# multicolor_patch_fit_residual(): fit'in KÖTÜ KOŞULLANMIŞ sayılacağı eşik
+# (RGB 0-255 uzayında öklid mesafe). Gerçek baskı verisiyle (docs/decisions/
+# 0004, 22 Eylül) HENÜZ kalibre edilmedi — bilinen tek somut veri noktası,
+# C'nin gerçek bir "yanlış ama emin" vakası (cbozuk1.jpeg, confidence=0.90
+# ile yanlış sınıf) vermesiydi, ama o vakanın KENDİ fit-residual değeri
+# ölçülmedi (fotoğraf repoda yok). Bu yüzden eşik MUHAFAZAKAR bir sezgisel:
+# iyi bir kalibrasyon KENDİ referans noktalarını (fit'in eğitildiği veri)
+# yakın eşleştirmelidir — 20 birimlik bir hata bile "referans noktalarının
+# kendisi bile iyi açıklanamıyor" demektir. Gerçek fotoğraf verisiyle
+# yeniden kalibre edilmeli (bkz. proje hatırlatma notu).
+MULTICOLOR_PATCH_FIT_RESIDUAL_THRESHOLD = 20.0
+
+
+def multicolor_patch_fit_residual(references: dict) -> float:
+    """`multicolor_patch`'in afin fit'inin KENDİ referans noktalarını ne
+    kadar iyi açıkladığını ölçer (en kötü noktadaki öklid mesafe, RGB
+    birimlerinde). Yüksek residual = KÖTÜ KOŞULLANMIŞ/GÜVENİLMEZ bir fit
+    (ör. az sayıda/birbirine çok yakın renkte referans noktası, ya da
+    gürültülü/tutarsız ölçüm) — bkz. docs/decisions/0004 "yanlış ama emin"
+    bulgusu. `pipeline.analyze` bunu `multicolor_patch`'i UYGULAMADAN ÖNCE
+    kontrol eder; eşiği aşarsa white_black'e (A) düşer (notes'a yazarak,
+    sessizce DEĞİL) — B'nin gama-kelepçesiyle AYNI ilke: en kötü durumda
+    bile en güvenilir bulunan A'dan daha kötü bir sonuç üretilmez.
+    """
+    design, true, matrix = _multicolor_patch_fit(references)
+    predicted = design @ matrix
+    residuals = np.linalg.norm(predicted - true, axis=1)
+    return float(residuals.max())
+
+
 def multicolor_patch(image: Image, references: dict) -> Image:
     """Çoklu sabit renk yaması ile 3x4 afin renk düzeltme (rapor §6.1 C).
 
@@ -105,15 +146,11 @@ def multicolor_patch(image: Image, references: dict) -> Image:
     kanallar ARASI karışımı da (ör. kırmızının yeşile sızması) modelleyen
     bir 3x4 afin matris (3x3 kazanç/karışım + ofset) çözer — daha fazla
     referans noktası ve baskı maliyeti gerektirir ama daha genel bir
-    düzeltmedir.
+    düzeltmedir. Fit'in GÜVENİLİRLİĞİ (kötü koşullanmış mı) burada
+    KONTROL EDİLMEZ — bkz. `multicolor_patch_fit_residual`, çağıran taraf
+    (pipeline.analyze) bunu apply ETMEDEN ÖNCE ayrıca kontrol eder.
     """
-    captured = np.asarray(references["captured"], dtype=np.float64)
-    true = np.asarray(references["true"], dtype=np.float64)
-    if captured.shape[0] < 4:
-        raise ValueError("multicolor_patch en az 4 referans noktası gerektirir (3x4 afin çözüm için).")
-
-    design = np.hstack([captured, np.ones((captured.shape[0], 1))])
-    matrix, *_ = np.linalg.lstsq(design, true, rcond=None)  # (4,3)
+    _, _, matrix = _multicolor_patch_fit(references)
 
     flat = image.reshape(-1, 3).astype(np.float64)
     flat_design = np.hstack([flat, np.ones((flat.shape[0], 1))])

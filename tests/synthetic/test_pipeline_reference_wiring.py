@@ -46,7 +46,38 @@ def _profile(code: str) -> dict:
     }
 
 
-@pytest.mark.parametrize("code", ["white_black", "white_gray_black", "multicolor_patch"])
+@pytest.mark.parametrize(
+    "code",
+    [
+        "white_black",
+        "white_gray_black",
+        pytest.param(
+            "multicolor_patch",
+            marks=pytest.mark.xfail(
+                reason=(
+                    "BİLİNEN HATA (28 Eylül, Dart tarafında düzeltildi — bkz. "
+                    "packages_dart/color_engine/lib/src/pipeline.dart _canonicalBorder "
+                    "yorumu): kenar referans yamaları (B/C) QR'dan `border + "
+                    "EDGE_PATCH_MARGIN` modül kadar dışarıda basılıyor ama "
+                    "pipeline.py::_CANONICAL_BORDER hâlâ sadece 4 kullanıyor — "
+                    "warp_to_canonical'ın ürettiği canonical görüntü bu yamaları hiç "
+                    "içermiyor, negatif piksel koordinatı numpy'nin negatif indeksleme "
+                    "davranışıyla YANLIŞ bir bölgeden okunuyor. multicolor_patch_fit_"
+                    "residual (28 Eylül eklendi) bunu artık doğru şekilde yakalayıp "
+                    "white_black'e düşüyor — ama bu ASIL sorunu ÇÖZMÜYOR, sadece "
+                    "GÜVENLİ BİR TABANA düşürüyor. white_gray_black (B) de AYNI "
+                    "kırılmayı taşıyor (rastgele/sabit bir köşe rengi okuyor) ama "
+                    "onun için residual-benzeri bir kontrol YOK, bu yüzden bu "
+                    "parametrize durumu hâlâ (yanlışlıkla) PASSED görünüyor — Python "
+                    "tarafı düzeltilene kadar B'nin sonucu da GÜVENİLMEZ sayılmalı. "
+                    "Python tarafının düzeltmesi kasıtlı olarak ERTELENDİ (kullanıcı "
+                    "talebi) — bkz. docs/decisions/0004."
+                ),
+                strict=True,
+            ),
+        ),
+    ],
+)
 def test_analyze_uses_producer_reference_patches_without_falling_back(code, tmp_path):
     """export_label() ile GERÇEKTEN üretilen bir etiketi analyze() ile
     okuyunca, hiçbir B/C fallback notu OLMAMALI — üretici bastığı referansı
@@ -83,6 +114,43 @@ def test_analyze_falls_back_gracefully_when_gray_reference_missing():
 
     assert out.rescan_recommended is False
     assert any("gray" in note and "düşüldü" in note for note in out.notes)
+
+
+def test_analyze_falls_back_to_white_black_when_multicolor_fit_is_unreliable(tmp_path):
+    """C seçilmiş, >=4 referans noktası VAR ama birinin ölçümü (ör. gerçek
+    baskıda parlama/kusur) tutarsız -- pipeline bunu (calibration.
+    multicolor_patch_fit_residual ile) ÖNCEDEN tespit edip white_black'e
+    düşmeli, notta AÇIKÇA belirtmeli (28 Eylül, docs/decisions/0004'teki
+    C'nin 'yanlış ama emin' bulgusuna motive edilen güvenlik ağı)."""
+    payload = build_label_payload("TR-WIRING-2", "LEVREK", "2026-09-20", "GENIPIN_PUTRESIN_v2", "QR_SENSOR_v4")
+    profile = _profile("multicolor_patch")
+
+    result = export_label(payload, tmp_path, density="low", sensor_profile=profile)
+
+    from PIL import Image
+
+    img = Image.open(result["paths"]["state_fresh"])
+    photo = _fake_photo(img).copy()
+
+    # Bir referans yamasının piksel bölgesini (renkli yamalardan biri)
+    # gerçekçi olmayan, TUTARSIZ bir renkle boya -- "bu yama kusurlu/parlamalı
+    # ölçüldü" senaryosunu simüle eder (kanal-karışımı modelinin diğer
+    # noktalarla açıklayamayacağı bir sapma).
+    ref_regions = result["layout"]["reference_regions"]
+    extra_name = next(name for name in ref_regions if name not in ("white", "black"))
+    from packages.qr_layout.colors import module_pixel_center
+
+    row, col = ref_regions[extra_name][0]
+    cy, cx = module_pixel_center(row, col, scale=10, border=4)
+    # `_fake_photo` perspektif + ölçek uyguladığı için tam piksel eşlemesi
+    # kesin değil -- geniş bir bölgeyi boyayarak (örnekleme ROI'sini
+    # kapsayacak kadar) sağlamlaştırıyoruz.
+    photo[max(0, cy - 15) : cy + 15, max(0, cx - 15) : cx + 15] = (250, 10, 240)
+
+    out = analyze(photo, profile, result["layout"])
+
+    assert out.rescan_recommended is False
+    assert any("multicolor_patch" in note and "düşüldü" in note for note in out.notes), out.notes
 
 
 def test_analyze_falls_back_gracefully_when_multicolor_points_insufficient():

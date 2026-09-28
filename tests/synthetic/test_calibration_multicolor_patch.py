@@ -3,7 +3,12 @@
 import numpy as np
 import pytest
 
-from packages.color_engine.calibration import get, multicolor_patch
+from packages.color_engine.calibration import (
+    MULTICOLOR_PATCH_FIT_RESIDUAL_THRESHOLD,
+    get,
+    multicolor_patch,
+    multicolor_patch_fit_residual,
+)
 
 
 def _apply_cross_channel_distortion(rgb):
@@ -48,3 +53,33 @@ def test_multicolor_patch_requires_at_least_four_points():
 
 def test_get_returns_multicolor_patch_implementation():
     assert get("multicolor_patch") is multicolor_patch
+
+
+def test_fit_residual_is_low_for_well_conditioned_references():
+    """İYİ bir referans seti (gerçek bir afin/kanal-karışımı ilişkisinden
+    üretilmiş, test_multicolor_patch_recovers_cross_channel_distortion'daki
+    AYNI veri) fit'i KENDİ noktalarında da iyi açıklamalı — residual küçük."""
+    true_patches = [(255, 255, 255), (0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255), (128, 128, 128)]
+    captured_patches = [tuple(_apply_cross_channel_distortion(p)) for p in true_patches]
+
+    residual = multicolor_patch_fit_residual({"captured": captured_patches, "true": true_patches})
+
+    assert residual < MULTICOLOR_PATCH_FIT_RESIDUAL_THRESHOLD
+
+
+def test_fit_residual_is_high_for_inconsistent_references():
+    """GERÇEKÇİ bir bozulma senaryosu (28 Eylül, docs/decisions/0004'teki
+    C'nin 'yanlış ama emin' bulgusuna motive): referans yamalarından BİRİ
+    (ör. baskı kusuru/parlama yüzünden) diğerleriyle TUTARSIZ ölçülmüş --
+    hiçbir tek afin dönüşüm hepsini birden açıklayamaz, residual yüksek
+    kalmalı (fit'in KENDİ verisinde bile kötü performans göstermesi, bu
+    fit'in gerçek görüntüye uygulanmasının GÜVENİLMEZ olduğunun sinyali)."""
+    true_patches = [(255, 255, 255), (0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255), (128, 128, 128)]
+    captured_patches = [tuple(_apply_cross_channel_distortion(p)) for p in true_patches]
+    # Yeşil yamayı (index 3) tutarsız ölçülmüş gibi boz -- diğer 5 nokta
+    # normal afin ilişkiyi izliyor, bu biri UYMUYOR.
+    captured_patches[3] = (250, 10, 240)
+
+    residual = multicolor_patch_fit_residual({"captured": captured_patches, "true": true_patches})
+
+    assert residual > MULTICOLOR_PATCH_FIT_RESIDUAL_THRESHOLD

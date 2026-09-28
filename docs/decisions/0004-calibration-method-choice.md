@@ -96,6 +96,49 @@ sonra biz karar vericez"). Ama artık kararı destekleyen veri sentetik
 + ekran fotoğrafından ibaret değil, gerçek baskıyla iki bağımsız turda
 doğrulanmış durumda.
 
+## ÖNEMLİ EK BULGU (28 Eylül): B/C'nin kötü performansının olası GERÇEK
+## kök nedeni bulundu — yöntemin kendisi değil, bir uygulama hatası
+
+Yukarıdaki A/B/C karşılaştırması "B ve C, yöntem olarak A'dan daha
+kırılgan" şeklinde yorumlandı. Ama C'nin `multicolor_patch` için yeni
+eklenen bir güvenlik kontrolünü (fit'in kendi referans noktalarını ne
+kadar iyi açıkladığını ölçen `multicolor_patch_fit_residual`) test
+ederken şu bulundu: **kenar referans yamaları (B'nin grisi, C'nin renkli
+yamaları) GERÇEK RENDER EDİLMİŞ bir etikette okuyucu tarafından HİÇ
+doğru örneklenmiyor.**
+
+Sebep: bu yamalar QR'dan `border + EDGE_PATCH_MARGIN` (4+4=8) modül
+kadar dışarıda basılıyor (`qr_layout/colors.py::edge_patch_positions`'ın
+kendi docstring'i okuyucunun bunu bilmesi gerektiğini zaten söylüyor) —
+ama `color_engine/pipeline.py`'deki okuyucu hem canonical (homografi
+sonrası) görüntüyü hem de referans-pozisyon-piksel dönüşümünü SADECE
+`border=4` ile yapıyor. Sonuç: canonical görüntü bu yamaları hiç
+içermiyor, pozisyon hesabı negatif bir piksel koordinatına düşüyor ve
+(Python'da numpy'nin negatif indekslemesi yüzünden) SESSİZCE yanlış bir
+bölgeden okunuyor.
+
+**Dart tarafında (28 Eylül) düzeltildi** — bkz.
+`packages_dart/color_engine/lib/src/pipeline.dart` `_canonicalBorder`
+yorumu; orada AYNI hata (Dart'ta RangeError ile ÇÖKME olarak tezahür
+ediyordu) gerçek render+analyze zinciriyle kanıtlanıp düzeltildi (bkz.
+`apps/freshqr/test/reference_patch_sampling_test.dart`).
+
+**Python tarafı BİLEREK henüz düzeltilmedi** (kullanıcı talebi, 28 Eylül)
+— `tests/synthetic/test_pipeline_reference_wiring.py`'deki ilgili test
+`multicolor_patch` için `xfail` ile işaretlendi, sebebi orada ayrıntılı
+açıklanıyor. `white_gray_black` (B) de muhtemelen AYNI hatayı taşıyor
+ama onun için residual-benzeri bir kontrol olmadığından hâlâ fark
+edilmeden "geçiyor" — B'nin sonucu da bu düzeltilene kadar GÜVENİLMEZ
+sayılmalı.
+
+**Bunun bu dosyanın kararı için anlamı:** A hâlâ en güvenilir/basit
+seçenek olmaya devam ediyor (ek yama gerektirmiyor, bu sınıf hatasından
+muaf). Ama B/C'nin yukarıdaki "gerçek baskıda kötü" bulgusu artık kesin
+olarak "yöntemin kendi matematiksel kırılganlığı" diye OKUNMAMALI — en
+azından KISMEN bu uygulama hatasından kaynaklanmış olabilir. Python
+tarafı düzeltilip B/C gerçek baskıda TEKRAR test edilmeden, A/B/C
+karşılaştırması nihai/güvenilir sayılmamalı.
+
 ## Sonraki adım
 
 - [x] **(18 Eylül)** B/C artık gerçek üretim akışına bağlı —
@@ -123,3 +166,10 @@ doğrulanmış durumda.
       düşük olması otomatik olarak "yeterli" demek değil.
 - [ ] Ekip + danışmanla nihai karar toplantısı — bu dosyadaki veri
       A lehine güçlü ama karar resmi olarak hâlâ verilmedi.
+- [x] **(28 Eylül, Dart)** Kenar referans yaması border uyumsuzluğu
+      düzeltildi — bkz. yukarıdaki "ÖNEMLİ EK BULGU".
+- [ ] **(28 Eylül, Python)** Aynı düzeltme `packages/color_engine/
+      pipeline.py::_CANONICAL_BORDER`'a da uygulanmalı (bilerek ertelendi)
+      — sonra B/C, 22 Eylül'deki GERÇEK basılı etiketlerle TEKRAR test
+      edilmeli (bu düzeltmeden önceki A/B/C karşılaştırması B/C için
+      güvenilmez olabilir, bkz. yukarı).

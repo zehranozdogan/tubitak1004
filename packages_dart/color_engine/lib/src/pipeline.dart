@@ -44,7 +44,8 @@
 import 'dart:math' as math;
 
 import 'package:profile_schema/profile_schema.dart' as schema;
-import 'package:qr_layout/qr_layout.dart' show edgeReferenceColors, finderBlackModule, finderPatternCornerPositions, finderWhiteModule;
+import 'package:qr_layout/qr_layout.dart'
+    show edgePatchMargin, edgeReferenceColors, finderBlackModule, finderPatternCornerPositions, finderWhiteModule;
 
 import 'calibration.dart';
 import 'colorspace.dart';
@@ -57,7 +58,30 @@ import 'types.dart';
 ({int row, int col}) _toNamedCell((int, int) cell) => (row: cell.$1, col: cell.$2);
 
 const int _canonicalScale = 10;
-const int _canonicalBorder = 4;
+// GERÇEK CİHAZ HATASI (28 Eylül) — bulundu ve düzeltildi: kenar referans
+// yamaları (B: gray, C: multicolor) QR'dan `border + edgePatchMargin`
+// modül kadar dışarıda basılıyor (bkz. qr_layout/colors.dart
+// edgeGrayPatchPosition/edgePatchPositions'ın KENDİ docstring'i: "okuyucu
+// TOPLAM border ile çağrılırsa doğru pikseli verir"). Ama `warpToCanonical`
+// VE `sampleRef` önceden SADECE 4 (edgePatchMargin'siz) kullanıyordu —
+// hem canonical görüntünün kendisi bu yamaları HİÇ İÇERMİYORDU (warp
+// sadece 4 modül kenar payı üretiyor, yama 8 modül dışarıda) hem de
+// pozisyon hesaplaması negatif bir piksel koordinatına düşüyordu;
+// `sampleModuleRoi`'nin `.clamp(0, ...)` davranışı yüzünden bu ya
+// SESSİZCE görüntünün SOL-ÜST köşesine YAKIN yanlış bir bölgeden
+// okunuyordu ya da (yeterince negatifse, x0==x1 kırpılınca) BOŞ bir
+// piksel yaması üretip `robustModuleColor`'da RangeError ile ÇÖKÜYORDU —
+// her iki davranış da GERÇEK render+analyze zinciriyle elle doğrulandı
+// (bkz. apps/freshqr/test/reference_patch_sampling_test.dart: düzeltme
+// geçici olarak geri alınıp testin RangeError ile çöktüğü gözlemlendi).
+// Sonuç: B/C kalibrasyonu GERÇEK FOTOĞRAFLARDA referans yamasını hiç
+// doğru örneklemiyordu — bu, docs/decisions/0004'teki aylardır kayıtlı
+// "B/C gerçek baskıda tutarsız" bulgusunun muhtemel GERÇEK kök nedeni.
+// Artık `_canonicalBorder` HER
+// ZAMAN `edgePatchMargin` kadar fazla (A/D/E'ye ek maliyeti sadece biraz
+// daha büyük bir canonical görüntü, doğruluk riski yok — in-grid
+// pozisyonlar border'a göre TUTARLI şekilde kayar, formül bozulmaz).
+const int _canonicalBorder = 4 + edgePatchMargin;
 
 const Set<String> _supportedWithoutExtraReferences = {
   'white_black',

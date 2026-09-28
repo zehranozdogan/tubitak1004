@@ -278,11 +278,21 @@ def analyze(
             if name not in ("white", "black") and name in _REFERENCE_TRUE_COLORS_BGR and ref_regions.get(name)
         ]
         if len(extra_names) + 2 >= 4:  # white+black+ekstra >= 4 nokta (calibration.multicolor_patch şartı)
-            references = {
+            multicolor_references = {
                 "captured": [white_ref, black_ref] + [_sample_ref(tuple(ref_regions[n][0])) for n in extra_names],
                 "true": [_REFERENCE_TRUE_COLORS_BGR["white"], _REFERENCE_TRUE_COLORS_BGR["black"]]
                 + [_REFERENCE_TRUE_COLORS_BGR[n] for n in extra_names],
             }
+            residual = calibration.multicolor_patch_fit_residual(multicolor_references)
+            if residual > calibration.MULTICOLOR_PATCH_FIT_RESIDUAL_THRESHOLD:
+                notes.append(
+                    f"Kalibrasyon yöntemi 'multicolor_patch' referans noktalarını kendi "
+                    f"içinde tutarsız ölçtü (fit hatası {residual:.1f}, kötü koşullanmış/"
+                    "güvenilmez olabilir); white_black'e düşüldü."
+                )
+                code = "white_black"
+            else:
+                references = multicolor_references
         else:
             notes.append(
                 f"Kalibrasyon yöntemi 'multicolor_patch' >=4 referans noktası istiyor "
