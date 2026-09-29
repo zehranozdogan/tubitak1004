@@ -111,6 +111,21 @@ distance transform, safety score, crc32) ise gerçek Python ile BİREBİR.
   SAF bulanıklık (radius>=9) — bu yedeklerin hiçbiri gerçek hareket
   bulanıklığını düzeltmeye çalışmaz (o ayrıca denendi, işe yaramadı).
 
+  **PERFORMANS REGRESYONU BULUNDU VE DÜZELTİLDİ (29 Eylül, zehra'nın
+  telefonunda gerçek testte):** üç katmanlı yedek en kötü durumda ALTI
+  binarizer denemesi yapıyor — ML Kit çöken bir cihazda canlı kamerada
+  `decodeQrZxing` artık HER örneklenen karede çağrılıyor, QR henüz
+  kadraja girmemişken bile bu altı deneme her karede tüketiliyordu.
+  Eski/zayıf cihazda görünür bir yavaşlamaya/takılmaya (VE muhtemelen
+  buna bağlı olarak yanlış sonuçlara — kamera arabelleğinin işlem
+  sürerken yenilenmesi gibi ikincil etkilerle) yol açtı. `decodeQrZxing`
+  artık `thorough` parametresi alıyor (varsayılan `true`, geriye dönük
+  uyumlu — dosya/fotoğraf yükleme yolunda hep kullanılıyor, hız kritik
+  değil); canlı kamera yolu (`camera_scanner.dart`) `thorough=false`
+  (sadece hızlı ham deneme) varsayılan kullanıyor, pahalı yedekleri
+  sadece periyodik olarak (`_thoroughZxingEveryNAttempts`, her 5 zxing2
+  denemesinden birinde) dener.
+
 `render.py` (SVG/PNG rasterize) Flutter'da `CustomPainter` yerine doğrudan
 piksel üreten `render.dart`'a taşındı (zehra, 23-24 Eylül) —
 `renderColoredImage`/`renderLabelImage`/`syntheticStatesPngBytes`.

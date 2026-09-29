@@ -284,6 +284,35 @@ void main() {
       );
     });
 
+    test(
+        'thorough=false PERFORMANS anahtarı: pahalı yedek katmanları (denoise + '
+        'blok-kontrast-germe) gerçekten ATLAR, sadece hızlı ham denemeyi yapar', () {
+      // GERÇEK CİHAZ REGRESYONU (29 Eylül, zehra'nın telefonunda): ML Kit
+      // çöken bir cihazda canlı kamerada decodeQrZxing HER örneklenen
+      // karede çağrılıyor -- pahalı yedekleri her seferinde denemek
+      // görünür bir yavaşlamaya yol açtı (bkz. camera_scanner.dart
+      // "_thoroughZxingEveryNAttempts" notu). `thorough=false` sadece ham
+      // denemeyi yapmalı; bu testte SADECE denoise/blok-germe ile çözülen
+      // (yukarıdaki iki testten AYNI) senaryolar `thorough=false` ile
+      // BAŞARISIZ, `thorough=true` (varsayılan) ile BAŞARILI olmalı.
+      final clean = _renderReal();
+      final jpegCase = _withJpeg(_withBoxBlur(clean, 5), 12);
+      final lightCase = _withDiagonalLightGradient(clean, 0.22, 1.9);
+
+      for (final entry in <String, img.Image>{'jpeg+blur': jpegCase, 'aşırı ışık': lightCase}.entries) {
+        expect(
+          decodeQrZxing(entry.value, thorough: false),
+          isNull,
+          reason: '${entry.key}: thorough=false pahalı yedekleri atlamalı, başarısız kalmalı',
+        );
+        expect(
+          decodeQrZxing(entry.value),
+          isNotNull,
+          reason: '${entry.key}: thorough=true (varsayılan) hâlâ çözebilmeli',
+        );
+      }
+    });
+
     test('24 etikette (8 parti no × 3 durum) temiz görüntüde TAMAMI çözülür', () {
       var ok = 0;
       for (var n = 45678; n < 45686; n++) {

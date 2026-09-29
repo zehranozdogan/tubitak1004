@@ -125,10 +125,29 @@ class ZxingDecodeResult {
 /// olarak SAF bulanıklık (radius>=9, bkz. dosya başlığının blur notu —
 /// bu yedeklerden HİÇBİRİ gerçek hareket bulanıklığını düzeltmeye
 /// çalışmaz, o ayrıca denendi ve işe yaramadı).
-ZxingDecodeResult? decodeQrZxing(img.Image image) {
-  final result = _decodeWithBothBinarizers(image) ??
-      _decodeWithBothBinarizers(_lightDenoise(image)) ??
-      _decodeWithBothBinarizers(_blockContrastStretch(image));
+///
+/// PERFORMANS UYARISI (29 Eylül, ZEHRA'NIN TELEFONUNDA gerçek regresyon
+/// bulundu): `thorough=true` (varsayılan) en kötü durumda (hiçbir yedek
+/// bulamazsa) ALTI binarizer denemesi yapıyor (3 katman × 2 binarizer) —
+/// ML Kit çöken bir cihazda CANLI KAMERA yolunda decodeQrZxing artık HER
+/// örneklenen karede çağrılıyor; QR henüz kadraja girmemişken bile bu
+/// altı denemenin TAMAMI her karede başarısız olup tüketiliyor. Eski/
+/// zayıf bir cihazda bu görünür bir yavaşlamaya/takılmaya yol açtı VE
+/// (muhtemelen kamera arabelleğinin işlem sürerken yenilenmesi ya da
+/// kullanıcının telefonu daha yorucu bir süre sabit tutmaya çalışması
+/// yüzünden) yanlış sonuç bildirimlerine denk geldi. `thorough=false`
+/// SADECE ilk (ham) katmanı dener — çağıran taraf (bkz. apps/freshqr/
+/// lib/screens/user/widgets/camera_scanner.dart) canlı kamerada bunu
+/// varsayılan kullanır, pahalı yedekleri sadece PERİYODİK olarak (birkaç
+/// karede bir) `thorough=true` ile dener. Dosya/fotoğraf yükleme yolunda
+/// (apps/freshqr/lib/services/static_image_scan.dart) hız kritik değil,
+/// orada hep `thorough=true` (varsayılan) kullanılır.
+ZxingDecodeResult? decodeQrZxing(img.Image image, {bool thorough = true}) {
+  var result = _decodeWithBothBinarizers(image);
+  if (thorough) {
+    result ??= _decodeWithBothBinarizers(_lightDenoise(image));
+    result ??= _decodeWithBothBinarizers(_blockContrastStretch(image));
+  }
   if (result == null) return null;
 
   final pts = result.resultPoints;

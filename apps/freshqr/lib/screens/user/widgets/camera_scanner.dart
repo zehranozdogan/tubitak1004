@@ -125,6 +125,18 @@ class _CameraScannerState extends State<CameraScanner> {
   String? _mlKitError;
   bool _busy = false;
   bool _done = false;
+  // zxing2'nin pahalı yedek katmanlarını (hafif-denoise + blok-kontrast-
+  // germe, bkz. qr_layout/decode.dart "PERFORMANS UYARISI") CANLI kamerada
+  // HER örneklenen karede denemek, ML Kit çöken bir cihazda (decodeQrZxing
+  // o zaman HER karede çağrılıyor) görünür bir yavaşlamaya/takılmaya yol
+  // açtı (zehra'nın telefonunda 29 Eylül'de gözlendi) — QR henüz kadraja
+  // girmemişken bile 6 binarizer denemesinin TAMAMI her karede tüketiliyordu.
+  // Artık sadece her `_thoroughZxingEveryNAttempts` zxing2 denemesinden
+  // birinde pahalı katmanlar da denenir; aradaki karelerde SADECE hızlı
+  // ham deneme yapılır (mutlu yolda -- QR zaten kadrajdaysa -- ekstra
+  // maliyet yok, ham deneme genelde yeterli).
+  static const int _thoroughZxingEveryNAttempts = 5;
+  int _zxingAttemptCount = 0;
 
   @override
   void initState() {
@@ -232,7 +244,9 @@ class _CameraScannerState extends State<CameraScanner> {
       }
 
       final rgbForZxing = _frameToRgb(image, rotation);
-      final zx = decodeQrZxing(rgbToImgImage(rgbForZxing));
+      _zxingAttemptCount++;
+      final thorough = _zxingAttemptCount % _thoroughZxingEveryNAttempts == 0;
+      final zx = decodeQrZxing(rgbToImgImage(rgbForZxing), thorough: thorough);
       if (zx != null && zx.finderPoints != null) {
         await _finish(
           controller,
