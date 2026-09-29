@@ -82,6 +82,21 @@ distance transform, safety score, crc32) ise gerçek Python ile BİREBİR.
   eski (Global-yalnız) davranış BAŞARISIZ, güncel (Hybrid+Global) BAŞARILI
   (bkz. test/decode_test.dart "GERÇEK CİHAZ BUG REGRESYONU").
 
+  **JPEG-artefakt yedeği (29 Eylül):** 108 kombinasyonluk (perspektif ×
+  ışık × bulanıklık × JPEG kalitesi) BİRLEŞİK bir stres matrisiyle bulundu
+  — ML Kit'in ÇALIŞMADIĞI cihazlarda (bkz. proje notu: eski Android'de
+  Play Hizmetleri uyumsuzluğu) zxing2 artık TEK decoder olabildiği için
+  bu tür gerçekçi-birleşik testler önem kazandı. Sonuç NETTİ:
+  başarısızlıkların TAMAMI düşük JPEG kalitesiyle (blok artefaktı)
+  ilişkiliydi — diğer üç faktör TEK BAŞINA sorun değildi, JPEG'le
+  BİRLEŞİNCE eşik düşüyordu. Hem Hybrid hem Global başarısız olursa
+  artık 3x3 hafif kutu bulanıklaştırma (`_lightDenoise` — JPEG'in blok
+  sınırı gürültüsünü yumuşatır, gerçek hareket bulanıklığını düzeltmeye
+  ÇALIŞMAZ, o AYRICA denendi ve işe yaramadı, bkz. `realistic_
+  distortions_test.dart`) uygulanıp iki binarizer de tekrar denenir.
+  Ölçülen: eski davranış 85/108, yeni 108/108, SIFIR regresyon (bkz.
+  `decode_test.dart` "GERÇEK BİRLEŞİK BOZULMA").
+
 `render.py` (SVG/PNG rasterize) Flutter'da `CustomPainter` yerine doğrudan
 piksel üreten `render.dart`'a taşındı (zehra, 23-24 Eylül) —
 `renderColoredImage`/`renderLabelImage`/`syntheticStatesPngBytes`.

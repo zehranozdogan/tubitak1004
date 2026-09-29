@@ -95,6 +95,53 @@ double _dist(List<double> a, List<double> b) {
   return math.sqrt(dx * dx + dy * dy);
 }
 
+/// Tek eksenli kutu bulanıklaştırma — hareket bulanıklığının basit bir
+/// simülasyonu (apps/freshqr/test/realistic_distortions_test.dart'taki
+/// AYNI teknik).
+img.Image _withBoxBlur(img.Image src, int radius) {
+  if (radius == 0) return src;
+  final out = img.Image.from(src);
+  for (var y = 0; y < src.height; y++) {
+    for (var x = 0; x < src.width; x++) {
+      var r = 0, g = 0, b = 0, n = 0;
+      for (var k = -radius; k <= radius; k++) {
+        final sx = (x + k).clamp(0, src.width - 1);
+        final p = src.getPixel(sx, y);
+        r += p.r.toInt();
+        g += p.g.toInt();
+        b += p.b.toInt();
+        n++;
+      }
+      out.setPixelRgb(x, y, r ~/ n, g ~/ n, b ~/ n);
+    }
+  }
+  return out;
+}
+
+/// JPEG sıkıştırma round-trip'i (gerçek telefon fotoğrafları PNG değil).
+img.Image _withJpeg(img.Image src, int quality) {
+  return img.decodeJpg(img.encodeJpg(src, quality: quality))!;
+}
+
+/// `decodeQrZxing`'in KENDİ `_lightDenoise` yedeğini DEVRE DIŞI bırakan
+/// eski davranış — SADECE karşılaştırma için (bkz. aşağıdaki test).
+bool _decodeWithoutDenoiseFallback(img.Image image) {
+  zx.LuminanceSource source() => zx.RGBLuminanceSource(
+        image.width,
+        image.height,
+        image.convert(numChannels: 4).getBytes(order: img.ChannelOrder.abgr).buffer.asInt32List(),
+      );
+  for (final binarizer in [zx.HybridBinarizer(source()), zx.GlobalHistogramBinarizer(source())]) {
+    try {
+      zx.QRCodeReader().decode(zx.BinaryBitmap(binarizer));
+      return true;
+    } catch (_) {
+      continue;
+    }
+  }
+  return false;
+}
+
 bool _decodeWithGlobalHistogramOnly(img.Image image) {
   final source = zx.RGBLuminanceSource(
     image.width,
@@ -156,6 +203,39 @@ void main() {
         final shaded = _withGradientShadow(clean, darkFactor);
         expect(_decodeWithGlobalHistogramOnly(shaded), isFalse, reason: 'darkFactor=$darkFactor: eski davranış ZATEN başarısızdı (regresyon varsayımı)');
         expect(decodeQrZxing(shaded), isNotNull, reason: 'darkFactor=$darkFactor: HybridBinarizer içeren GÜNCEL decodeQrZxing çözebilmeli');
+      }
+    });
+
+    test(
+        'GERÇEK BİRLEŞİK BOZULMA (29 Eylül): JPEG blok artefaktı diğer '
+        'bozulmalarla (perspektif/ışık/bulanıklık) BİRLEŞİNCE eski davranış '
+        'başarısız olur, hafif-denoise yedeği düzeltir', () {
+      // 108 kombinasyonluk (perspektif × ışık × bulanıklık × JPEG kalitesi)
+      // bir stres matrisinde ÖLÇÜLDÜ: eski davranış 85/108, yeni (hafif
+      // denoise yedeği) 108/108, SIFIR regresyon. Örüntü NET: başarısızlıkların
+      // TAMAMI düşük JPEG kalitesiyle (12) ilişkiliydi — perspektif/ışık/
+      // bulanıklık TEK BAŞINA sorun değildi, JPEG bloklamasıyla BİRLEŞİNCE
+      // eşiği düşürüyordu (bkz. decode.dart "JPEG-ARTEFAKT YEDEĞİ" notu).
+      // Burada o matristen 3 temsili (önceden başarısız, şimdi başarılı)
+      // vaka kalıcı regresyon testi olarak tutuluyor.
+      final clean = _renderReal();
+
+      final cases = <String, img.Image>{
+        'blur=5 jpeg=12': _withJpeg(_withBoxBlur(clean, 5), 12),
+        'blur=7 jpeg=12': _withJpeg(_withBoxBlur(clean, 7), 12),
+      };
+
+      for (final entry in cases.entries) {
+        expect(
+          _decodeWithoutDenoiseFallback(entry.value),
+          isFalse,
+          reason: '${entry.key}: eski davranış ZATEN başarısızdı (regresyon varsayımı)',
+        );
+        expect(
+          decodeQrZxing(entry.value),
+          isNotNull,
+          reason: '${entry.key}: hafif-denoise yedeği içeren GÜNCEL decodeQrZxing çözebilmeli',
+        );
       }
     });
 

@@ -91,22 +91,22 @@ class ZxingDecodeResult {
 /// (aynı dokümanda "recommended class for library users") BÖLGESEL eşik
 /// hesaplıyor — önce bunu, olmazsa (görüntü çok küçükse HybridBinarizer
 /// minimum boyut ister) Global'e düşer.
+///
+/// JPEG-ARTEFAKT YEDEĞİ (29 Eylül, gerçekçi BİRLEŞİK bozulma matrisiyle
+/// bulundu — bkz. test/decode_test.dart "GERÇEK BİRLEŞİK BOZULMA"): 108
+/// (perspektif × ışık × bulanıklık × JPEG kalitesi) kombinasyonluk bir
+/// stres testinde başarısızlıkların TAMAMI düşük JPEG kalitesiyle (blok
+/// artefaktı) ilişkiliydi — diğer üç faktör (perspektif/ışık/bulanıklık)
+/// TEK BAŞINA sorun değildi, JPEG bloklamasıyla BİRLEŞİNCE eşiği
+/// düşürüyordu. Hem Hybrid hem Global başarısız olursa artık 3x3 kutu
+/// bulanıklaştırma (`_lightDenoise` — JPEG'in 8x8 DCT blok sınırlarındaki
+/// yüksek-frekans gürültüsünü yumuşatır, gerçek modül yapısını bozacak
+/// kadar güçlü DEĞİL) uygulanıp İKİ binarizer de tekrar denenir. Ölçülen
+/// sonuç: aynı 108'lik matriste eski davranış 85/108, bu yedekle 108/108
+/// — SIFIR regresyon (yedek sadece ikisi de başarısız OLURSA devreye
+/// giriyor, mutlu yolda ekstra maliyet yok).
 ZxingDecodeResult? decodeQrZxing(img.Image image) {
-  zx.LuminanceSource source() => zx.RGBLuminanceSource(
-        image.width,
-        image.height,
-        image.convert(numChannels: 4).getBytes(order: img.ChannelOrder.abgr).buffer.asInt32List(),
-      );
-
-  zx.Result? result;
-  for (final binarizer in [zx.HybridBinarizer(source()), zx.GlobalHistogramBinarizer(source())]) {
-    try {
-      result = zx.QRCodeReader().decode(zx.BinaryBitmap(binarizer));
-      break;
-    } catch (_) {
-      continue;
-    }
-  }
+  final result = _decodeWithBothBinarizers(image) ?? _decodeWithBothBinarizers(_lightDenoise(image));
   if (result == null) return null;
 
   final pts = result.resultPoints;
@@ -124,6 +124,56 @@ ZxingDecodeResult? decodeQrZxing(img.Image image) {
     );
   }
   return ZxingDecodeResult(result.text, finderPoints);
+}
+
+/// Hybrid, olmazsa Global binarizer ile TEK bir görüntüde decode dener.
+/// Her ikisi de başarısızsa `null` (istisna fırlatmaz).
+zx.Result? _decodeWithBothBinarizers(img.Image image) {
+  zx.LuminanceSource source() => zx.RGBLuminanceSource(
+        image.width,
+        image.height,
+        image.convert(numChannels: 4).getBytes(order: img.ChannelOrder.abgr).buffer.asInt32List(),
+      );
+  for (final binarizer in [zx.HybridBinarizer(source()), zx.GlobalHistogramBinarizer(source())]) {
+    try {
+      return zx.QRCodeReader().decode(zx.BinaryBitmap(binarizer));
+    } catch (_) {
+      continue;
+    }
+  }
+  return null;
+}
+
+/// 3x3 kutu bulanıklaştırma — bkz. `decodeQrZxing` başlığındaki "JPEG-
+/// ARTEFAKT YEDEĞİ" notu. Bilinçli olarak ÇOK KÜÇÜK (yarıçap 1): sadece
+/// JPEG'in blok-sınırı gürültüsünü yumuşatmaya yeter, gerçek hareket
+/// bulanıklığı testlerinde (bkz. aynı dosyadaki "GERÇEK CİHAZ BUG
+/// REGRESYONU") kullanılan çok daha büyük yarıçaplarla KARIŞTIRILMAMALI —
+/// o tür gerçek bulanıklığı düzeltmeye çalışmaz (denendi, işe yaramadı,
+/// bkz. apps/freshqr/test/realistic_distortions_test.dart "DENENDİ, İŞE
+/// YARAMADI" notu — BU fonksiyon o denemeden FARKLI: burada amaç JPEG
+/// blok gürültüsü, orada amaç gerçek hareket bulanıklığını TERSİNE
+/// ÇEVİRMEKTİ, işe yaramayan oydu).
+img.Image _lightDenoise(img.Image image) {
+  final out = img.Image.from(image);
+  for (var y = 0; y < image.height; y++) {
+    for (var x = 0; x < image.width; x++) {
+      var r = 0, g = 0, b = 0, n = 0;
+      for (var dy = -1; dy <= 1; dy++) {
+        for (var dx = -1; dx <= 1; dx++) {
+          final sx = (x + dx).clamp(0, image.width - 1);
+          final sy = (y + dy).clamp(0, image.height - 1);
+          final p = image.getPixel(sx, sy);
+          r += p.r.toInt();
+          g += p.g.toInt();
+          b += p.b.toInt();
+          n++;
+        }
+      }
+      out.setPixelRgb(x, y, r ~/ n, g ~/ n, b ~/ n);
+    }
+  }
+  return out;
 }
 
 /// Finder pattern merkezlerinden (+ varsa hizalama deseninden) QR'ın
