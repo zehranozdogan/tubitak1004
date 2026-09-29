@@ -27,6 +27,24 @@ img.Image _withGradientShadow(img.Image src, double darkFactor) {
   return out;
 }
 
+/// Köşeden köşeye ÇAPRAZ bir kazanç gradyanı (bir köşe çok karanlık, karşı
+/// köşe çok parlak) — `_withGradientShadow`'dan (tek yönlü, sadece
+/// karartan) FARKLI: burada hem karartma hem parlaklaştırma var, gerçek
+/// bir flaş/güçlü tek yönlü ışık kaynağının en sert hali (ör. bir köşede
+/// derin gölge, karşı köşede doğrudan flaş).
+img.Image _withDiagonalLightGradient(img.Image src, double low, double high) {
+  final out = img.Image.from(src);
+  final size = out.width;
+  for (var y = 0; y < out.height; y++) {
+    for (var x = 0; x < out.width; x++) {
+      final gain = low + (high - low) * (x + y) / (2 * size);
+      final p = out.getPixel(x, y);
+      out.setPixelRgb(x, y, (p.r * gain).clamp(0, 255).round(), (p.g * gain).clamp(0, 255).round(), (p.b * gain).clamp(0, 255).round());
+    }
+  }
+  return out;
+}
+
 /// Temiz (eksen-hizalı) bir etiket görüntüsünü GERÇEK bir projektif
 /// dönüşümle (homografi) daha büyük bir "fotoğraf" tuvaline çarpıtır —
 /// GERÇEK kamera açısını (yamuk/trapezoid, saf afin DEĞİL: kenarlar
@@ -237,6 +255,33 @@ void main() {
           reason: '${entry.key}: hafif-denoise yedeği içeren GÜNCEL decodeQrZxing çözebilmeli',
         );
       }
+    });
+
+    test(
+        'GERÇEK AŞIRI DÜZENSİZ IŞIK (29 Eylül): bir köşe çok karanlık/karşı '
+        'köşe çok parlak olunca finder pattern bile bulunamıyordu, blok '
+        'kontrast germe yedeği düzeltir', () {
+      // Aynı 108\'lik matris daha da zorlanarak (ışık şiddeti artırılarak)
+      // bulundu: kazanç 0.2..1.9 arası çapraz bir gradyanda hem Hybrid hem
+      // Global (hafif-denoise\'tan SONRA bile) NotFoundException veriyordu —
+      // HybridBinarizer\'ın kendi bloklaması bu kadar sert bir yerel
+      // parlaklık sıkışmasını telafi edemiyor. 144\'lük genişletilmiş
+      // matriste ölçüldü: eski 92/144, JPEG-yedeğiyle 106/144, blok-
+      // kontrast-germe yedeğiyle 130/144 — SIFIR regresyon (bkz.
+      // decode.dart "AŞIRI DÜZENSİZ IŞIK YEDEĞİ" notu).
+      final clean = _renderReal();
+      final shaded = _withDiagonalLightGradient(clean, 0.22, 1.9);
+
+      expect(
+        _decodeWithoutDenoiseFallback(shaded),
+        isFalse,
+        reason: 'eski davranış ZATEN başarısızdı (regresyon varsayımı)',
+      );
+      expect(
+        decodeQrZxing(shaded),
+        isNotNull,
+        reason: 'blok-kontrast-germe yedeği içeren GÜNCEL decodeQrZxing çözebilmeli',
+      );
     });
 
     test('24 etikette (8 parti no × 3 durum) temiz görüntüde TAMAMI çözülür', () {

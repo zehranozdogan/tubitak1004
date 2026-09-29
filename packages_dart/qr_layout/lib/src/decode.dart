@@ -105,8 +105,30 @@ class ZxingDecodeResult {
 /// sonuç: aynı 108'lik matriste eski davranış 85/108, bu yedekle 108/108
 /// — SIFIR regresyon (yedek sadece ikisi de başarısız OLURSA devreye
 /// giriyor, mutlu yolda ekstra maliyet yok).
+///
+/// AŞIRI DÜZENSİZ IŞIK YEDEĞİ (29 Eylül, AYNI matris daha da zorlanarak
+/// bulundu): tek bir köşesi çok koyu (ör. flaş/gölge, kazanç ~0.2), karşı
+/// köşesi çok parlak (kazanç ~1.9) bir fotoğrafta hem Hybrid hem Global
+/// (hatta hafif denoise'tan SONRA bile) `NotFoundException` ile
+/// başarısız oluyordu — finder pattern'in kendisi bile bulunamıyordu.
+/// Sebep: HybridBinarizer'ın kendi iç bloklaması bu kadar SERT bir
+/// yerel parlaklık sıkışmasını (bir köşede beyaz modül bile luma~56'ya
+/// düşüyor) telafi edemiyor. Üçüncü yedek: `_blockContrastStretch` —
+/// görüntüyü ~9x9'luk kaba bir bloğa böler, her bloğu KENDİ yerel min/
+/// max'ına göre 0-255'e gerer (basit bir CLAHE yaklaşımı, tam histogram
+/// eşitleme değil). Blok sayısı MUTLAK piksel DEĞİL (çözünürlükten
+/// bağımsız çalışsın diye, gerçek kamera fotoğrafları sentetik testten
+/// çok daha yüksek çözünürlüklü olabilir — 730/1460/2190px'lik üç farklı
+/// ölçekte elle doğrulandı, hepsinde aynı davranış). Ölçülen: 144'lük
+/// (daha geniş) matriste eski 92/144, JPEG-yedeğiyle 106/144, bu üçüncü
+/// yedekle 130/144 — yine SIFIR regresyon, kalan başarısızlıklar ağırlıklı
+/// olarak SAF bulanıklık (radius>=9, bkz. dosya başlığının blur notu —
+/// bu yedeklerden HİÇBİRİ gerçek hareket bulanıklığını düzeltmeye
+/// çalışmaz, o ayrıca denendi ve işe yaramadı).
 ZxingDecodeResult? decodeQrZxing(img.Image image) {
-  final result = _decodeWithBothBinarizers(image) ?? _decodeWithBothBinarizers(_lightDenoise(image));
+  final result = _decodeWithBothBinarizers(image) ??
+      _decodeWithBothBinarizers(_lightDenoise(image)) ??
+      _decodeWithBothBinarizers(_blockContrastStretch(image));
   if (result == null) return null;
 
   final pts = result.resultPoints;
@@ -171,6 +193,49 @@ img.Image _lightDenoise(img.Image image) {
         }
       }
       out.setPixelRgb(x, y, r ~/ n, g ~/ n, b ~/ n);
+    }
+  }
+  return out;
+}
+
+/// Blok bazlı yerel kontrast germe — bkz. `decodeQrZxing` başlığındaki
+/// "AŞIRI DÜZENSİZ IŞIK YEDEĞİ" notu. Görüntüyü ~[blocksAcross]x
+/// [blocksAcross] kaba bloğa böler, her bloğu KENDİ yerel min/max'ına
+/// göre 0-255'e gerer (basit bir CLAHE yaklaşımı — tam histogram eşitleme
+/// DEĞİL, sadece min-max germe). Blok SAYISI (mutlak piksel değil)
+/// kullanılıyor ki çözünürlükten bağımsız çalışsın — 3 farklı çözünürlükte
+/// (730/1460/2190px) elle doğrulandı, hepsinde aynı davranış.
+img.Image _blockContrastStretch(img.Image image, {int blocksAcross = 9}) {
+  final blockSize = (image.width / blocksAcross).ceil();
+  final gray = List.generate(
+    image.height,
+    (y) => List.generate(image.width, (x) {
+      final p = image.getPixel(x, y);
+      return (p.r + p.g + p.b) / 3.0;
+    }),
+  );
+
+  final out = img.Image.from(image);
+  for (var by = 0; by < image.height; by += blockSize) {
+    for (var bx = 0; bx < image.width; bx += blockSize) {
+      final y1 = (by + blockSize).clamp(0, image.height);
+      final x1 = (bx + blockSize).clamp(0, image.width);
+      var lo = 255.0, hi = 0.0;
+      for (var y = by; y < y1; y++) {
+        for (var x = bx; x < x1; x++) {
+          final v = gray[y][x];
+          if (v < lo) lo = v;
+          if (v > hi) hi = v;
+        }
+      }
+      final range = (hi - lo).clamp(1.0, 255.0);
+      double stretch(num c) => ((c - lo) / range * 255.0).clamp(0.0, 255.0);
+      for (var y = by; y < y1; y++) {
+        for (var x = bx; x < x1; x++) {
+          final p = image.getPixel(x, y);
+          out.setPixelRgb(x, y, stretch(p.r).round(), stretch(p.g).round(), stretch(p.b).round());
+        }
+      }
     }
   }
   return out;

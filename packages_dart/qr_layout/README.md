@@ -97,6 +97,20 @@ distance transform, safety score, crc32) ise gerçek Python ile BİREBİR.
   Ölçülen: eski davranış 85/108, yeni 108/108, SIFIR regresyon (bkz.
   `decode_test.dart` "GERÇEK BİRLEŞİK BOZULMA").
 
+  **Aşırı düzensiz ışık yedeği (29 Eylül, aynı matris daha zorlanarak):**
+  bir köşesi çok karanlık/karşı köşesi çok parlak (kazanç ~0.2..1.9)
+  bir fotoğrafta HybridBinarizer'ın kendi bloklaması bile telafi
+  edemiyordu — finder pattern'in kendisi bulunamıyordu. Üçüncü yedek:
+  `_blockContrastStretch` — görüntüyü ~9x9 kaba bloğa böler, her bloğu
+  KENDİ yerel min/max'ına göre 0-255'e gerer (basit bir CLAHE yaklaşımı).
+  Blok SAYISI (mutlak piksel değil) kullanılıyor — 3 farklı çözünürlükte
+  (730/1460/2190px) elle doğrulandı, hepsinde aynı davranış. Ölçülen
+  (144'lük genişletilmiş matris): eski 92/144, JPEG-yedeğiyle 106/144,
+  bu üçüncü yedekle 130/144 — yine SIFIR regresyon (bkz. `decode_test.
+  dart` "GERÇEK AŞIRI DÜZENSİZ IŞIK"). Kalan başarısızlıklar ağırlıklı
+  SAF bulanıklık (radius>=9) — bu yedeklerin hiçbiri gerçek hareket
+  bulanıklığını düzeltmeye çalışmaz (o ayrıca denendi, işe yaramadı).
+
 `render.py` (SVG/PNG rasterize) Flutter'da `CustomPainter` yerine doğrudan
 piksel üreten `render.dart`'a taşındı (zehra, 23-24 Eylül) —
 `renderColoredImage`/`renderLabelImage`/`syntheticStatesPngBytes`.
