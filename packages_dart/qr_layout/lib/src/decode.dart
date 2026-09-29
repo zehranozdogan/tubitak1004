@@ -274,6 +274,21 @@ img.Image _blockContrastStretch(img.Image image, {int blocksAcross = 9}) {
 /// eski not). BOŞSA (versiyon 1 ya da desen bulunamadı) eski 3-noktalı
 /// afin kestirime düşülür — o formülün doğrulama/sınırları için aşağıdaki
 /// `_estimateOuterCornersAffine`'e bkz.
+///
+/// DENENDİ, İŞE YARAMADI (29 Eylül) — "çapraz doğrulama": homografi ile
+/// afin'i karşılaştırıp ayrışırlarsa afin'e düşmeyi denedim (zehra'nın
+/// telefonunda "okuyor ama yanlış" bulgusuna motive edilerek — teori:
+/// homografi TEK bir hizalama noktasına aşırı bağımlı, o nokta gürültülü
+/// olabilir). KENDİ TESTLERİM tarafından ÇÜRÜTÜLDÜ: gerçek/güçlü
+/// perspektifte homografi ve afin zaten (BEKLENEN şekilde) ayrışıyor —
+/// bu ayrışma "hizalama noktası şüpheli" anlamına GELMİYOR, "gerçek
+/// perspektif var, homografi haklı" da anlamına gelebiliyor; bu ikisi bu
+/// karşılaştırmayla AYRIŞTIRILAMIYOR. Sonuç: düzeltme tam olarak işe
+/// yaraması gereken senaryoda (güçlü perspektif) homografiden vazgeçip
+/// daha kötü yönteme dönüyordu — geri alındı. "Okuyor ama yanlış"
+/// bulgusunun gerçek sebebi hâlâ AÇIK; gerçek cihaz verisi (Teknik
+/// detaylar ekran görüntüsü) olmadan bundan daha fazla ilerlemek
+/// spekülatif olur.
 List<List<double>> estimateOuterCorners(QrFinderPoints points, int matrixSize) {
   if (matrixSize <= 7) {
     throw ArgumentError('matrixSize (verilen: $matrixSize) finder pattern\'lardan (7 modül) büyük olmalı.');
