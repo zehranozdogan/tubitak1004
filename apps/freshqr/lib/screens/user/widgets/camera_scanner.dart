@@ -21,6 +21,25 @@
 // sorunundan tamamen bağımsız) düşülür; sonraki karelerde ML Kit HİÇ
 // denenmez.
 //
+// #4'ÜN OLASI KÖK NEDENİ (29 Eylül, masabaşı araştırma — Google'ın kendi
+// resmi "known issues" sayfası: developers.google.com/ml-kit/known-issues):
+// "Task callback'leri, kaydedildikleri Activity/Fragment yok edildikten
+// SONRA çalışabilir; bu, kapatılmış bir dedektöre erişmeye çalışırsa
+// NullPointerException'a yol açabilir." Kodumuzda TAM bu senaryoya izin
+// veren bir yarış durumu VARDI: `dispose()`, `_scanner.processImage()`
+// hâlâ devam ederken (`_busy=true`) KONTROLSÜZ `_scanner.close()`
+// çağırıyordu. Kullanıcı "Vazgeç"e basarsa (ya da ekrandan uzaklaşılırsa)
+// ve o anda ML Kit hâlâ bir kareyi işliyorsa (ESKİ/ZAYIF bir cihazda bu
+// saniyeler sürebilir — pencere ne kadar uzun açık kalırsa yarış o kadar
+// olası, tam olarak eski/yavaş cihazlarda daha sık görülmesini açıklıyor),
+// dispose native dedektörü kapatır, gecikmeli gelen sonuç kapatılmış
+// dedektöre erişmeye çalışır. Düzeltme: `_mlKitCallInFlight` — devam eden
+// bir `processImage()` çağrısı varsa, `_scanner.close()` o çağrı
+// TAMAMLANANA kadar ertelenir (bkz. `dispose()`). Bu KANITLANMIŞ bir
+// düzeltme değil (gerçek cihazda henüz doğrulanmadı) — ama Google'ın
+// KENDİ belgelediği bir mekanizmayla BİREBİR eşleşen, kodumuzda GERÇEKTEN
+// var olan bir yarış durumunu kapatıyor.
+//
 // GERÇEK CİHAZ HATASI (27 Eylül, ilk gerçek telefon testinde bulundu):
 // Y/VU düzlemlerini ham bayt olarak art arda ekleyip (`_concatenatePlanes`)
 // TEK bir `bytesPerRow` varsaymak, gerçek telefonlarda donanım hizalaması
@@ -92,6 +111,10 @@ class _CameraScannerState extends State<CameraScanner> {
   CameraController? _controller;
   int _frameCounter = 0;
   int _mlKitFailureStreak = 0;
+  // Devam eden bir `_scanner.processImage()` çağrısı varsa burada tutulur
+  // — bkz. dosya başlığı "#4'ÜN OLASI KÖK NEDENİ": `dispose()` bunu görürse
+  // `_scanner.close()`'u çağrı TAMAMLANANA kadar erteler.
+  Future<List<Barcode>>? _mlKitCallInFlight;
   // ML Kit bu cihazda GERÇEKTEN çöküyorsa (bkz. _onFrame — Play Services/ML
   // Kit kurulumuna özgü bir NullPointerException gözlendi, 27 Eylül gerçek
   // cihaz testi) bir kere işaretlenir; sonraki karelerde ML Kit'i HİÇ
@@ -161,7 +184,14 @@ class _CameraScannerState extends State<CameraScanner> {
         try {
           final input = _toInputImage(image, rotation);
           if (input != null) {
-            final barcodes = await _scanner.processImage(input);
+            final call = _scanner.processImage(input);
+            _mlKitCallInFlight = call;
+            final List<Barcode> barcodes;
+            try {
+              barcodes = await call;
+            } finally {
+              _mlKitCallInFlight = null;
+            }
             for (final barcode in barcodes) {
               final text = barcode.rawValue;
               // DOĞRULANMAMIŞ VARSAYIM (28 Eylül, bkz. proje notu): ML Kit'in
@@ -260,7 +290,18 @@ class _CameraScannerState extends State<CameraScanner> {
   void dispose() {
     _done = true;
     _controller?.dispose();
-    _scanner.close();
+    // Bkz. dosya başlığı "#4'ÜN OLASI KÖK NEDENİ": devam eden bir
+    // processImage() çağrısı varsa, native dedektörü HEMEN kapatmak
+    // Google'ın kendi belgelediği NullPointerException riskine yol
+    // açabilir — kapatmayı o çağrı TAMAMLANANA (başarı ya da hata) kadar
+    // ertele. `dispose()` senkron olmak zorunda, bu yüzden burada await
+    // EDİLMİYOR (bilerek fire-and-forget).
+    final pending = _mlKitCallInFlight;
+    if (pending != null) {
+      pending.then((_) => _scanner.close(), onError: (_) => _scanner.close());
+    } else {
+      _scanner.close();
+    }
     super.dispose();
   }
 
