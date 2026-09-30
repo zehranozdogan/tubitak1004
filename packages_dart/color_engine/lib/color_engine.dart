@@ -7,6 +7,7 @@ export 'src/types.dart';
 export 'src/colorspace.dart';
 export 'src/calibration.dart';
 export 'src/homography.dart';
+export 'src/grid_refine.dart';
 export 'src/roi.dart';
 export 'src/quality.dart';
 export 'src/matching.dart';
