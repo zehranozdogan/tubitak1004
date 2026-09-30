@@ -110,54 +110,22 @@ Future<ScanOutcome> analyzeCapturedLabel({
       flipped.contains(c) ? 1 - matrix[c.$1][c.$2] : matrix[c.$1][c.$2],
   ];
 
-  final roughCorners = corners ?? qr_layout.estimateOuterCorners(finderPoints!, resolved.layout.matrixSize);
-
-  // Köşeler decoder'dan KABA gelir (bkz. color_engine/grid_refine.dart —
-  // ~1 modül hata güveni 0.00'a düşürüp sonucu tamamen yanlışa çeviriyordu).
-  // Basılı desen (kasıtlı hatalar ters) bilindiği için köşeler ona hizalanır;
-  // renkli sensör hücreleri skora katılmaz.
-  final printed = [
-    for (var r = 0; r < matrix.length; r++)
-      [for (var c = 0; c < matrix.length; c++) flipped.contains((r, c)) ? 1 - matrix[r][c] : matrix[r][c]],
-  ];
-  final refined = refineQrCorners(
-    image,
-    roughCorners,
-    printed,
-    exclude: {for (final c in resolved.layout.sensorModules) c},
-  );
-  if (refined.matchRate < minGridMatchRate) {
-    return ScanSuccess(
-      ColorEngineResult(
-        qualityScore: qualityScore(image),
-        rescanRecommended: true,
-        notes: [
-          'QR ızgarası görüntüye hizalanamadı (modüllerin '
-              '%${(refined.matchRate * 100).round()}\'i beklenen desenle uyuştu); '
-              'etiketi düz ve kadrajı dolduracak şekilde tekrar tarayın.',
-        ],
-      ),
-      _labelInfo(payload),
-    );
-  }
+  final resolvedCorners = corners ?? qr_layout.estimateOuterCorners(finderPoints!, resolved.layout.matrixSize);
 
   final result = analyzeFrame(
     image,
     sensorProfile: loaded.profile,
     layoutVersion: resolved.layout,
-    qrCorners: refined.corners,
+    qrCorners: resolvedCorners,
     sensorModuleBits: bits,
   );
 
-  return ScanSuccess(result, _labelInfo(payload));
-}
-
-LabelInfo _labelInfo(schema.LabelPayload payload) => LabelInfo(
+  return ScanSuccess(
+    result,
+    LabelInfo(
       productType: _titleCase(payload.productType),
       productId: payload.productId,
       productionDate: _displayDate(payload.productionDate),
-    );
-
-/// Bu orandan az modül beklenen desenle uyuşuyorsa ızgara hizalanmamış
-/// sayılır (rastgele hizada ~0.5, düzgün karede ~0.95+).
-const double minGridMatchRate = 0.8;
+    ),
+  );
+}
