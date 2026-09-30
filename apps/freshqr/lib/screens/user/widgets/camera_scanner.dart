@@ -58,6 +58,7 @@ import 'package:color_engine/color_engine.dart' show RgbImage;
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
+import 'package:image/image.dart' as img;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_layout/qr_layout.dart' show QrFinderPoints, decodeQrZxing;
 
@@ -137,6 +138,22 @@ class _CameraScannerState extends State<CameraScanner> {
   // maliyet yok, ham deneme genelde yeterli).
   static const int _thoroughZxingEveryNAttempts = 5;
   int _zxingAttemptCount = 0;
+  // GERÇEK CİHAZ HATASI (30 Eylül, "kamera çok donuyor"): `thorough`
+  // ortalama maliyeti düşürse de, HER örneklenen karede zxing2'ye TAM
+  // ÇÖZÜNÜRLÜKLÜ (`ResolutionPreset.high`, gerçek cihazda 1280x720+ olabilir)
+  // bir görüntü veriliyordu -- bu piksel-bazlı Dart döngüleri (NV21->RGB,
+  // RGB->img.Image, zxing2'nin KENDİ binarizasyon/tarama işi) UI ile AYNI
+  // isolate'te SENKRON çalışıyor; ne kadar hızlı olursa olsun bu iş UI
+  // isolate'ini bloke ediyor -- "donma" ortalama hızdan değil, senkron
+  // çalışmanın kendisinden kaynaklanıyor. Çözüm: zxing2 TESPİTİ için
+  // görüntü küçük bir çalışma kopyasına indirgeniyor (`_zxingDetectionMaxDimension`)
+  // -- QR TESPİTİ birkaç piksel/modül yeterliyken, RENK OKUMASI (bkz.
+  // dosya başlığı "Renk okuması için çözünürlük önemli") hâlâ TAM
+  // çözünürlüklü `rgbForZxing`'den yapılıyor, sadece bulunan köşeler ölçek
+  // faktörüyle geri büyütülüyor (bkz. `_onFrame`). Bu, hem her karenin
+  // piksel işi ~O(scale²) azaltıyor hem de daha az frame düşürülmesini
+  // sağlıyor.
+  static const int _zxingDetectionMaxDimension = 640;
 
   @override
   void initState() {
@@ -246,13 +263,27 @@ class _CameraScannerState extends State<CameraScanner> {
       final rgbForZxing = _frameToRgb(image, rotation);
       _zxingAttemptCount++;
       final thorough = _zxingAttemptCount % _thoroughZxingEveryNAttempts == 0;
-      final zx = decodeQrZxing(rgbToImgImage(rgbForZxing), thorough: thorough);
+      final fullImg = rgbToImgImage(rgbForZxing);
+      final longestSide = fullImg.width > fullImg.height ? fullImg.width : fullImg.height;
+      final detectionScale = longestSide > _zxingDetectionMaxDimension ? _zxingDetectionMaxDimension / longestSide : 1.0;
+      final detectionImg = detectionScale == 1.0
+          ? fullImg
+          : img.copyResize(
+              fullImg,
+              width: (fullImg.width * detectionScale).round(),
+              height: (fullImg.height * detectionScale).round(),
+            );
+      final zx = decodeQrZxing(detectionImg, thorough: thorough);
       if (zx != null && zx.finderPoints != null) {
         await _finish(
           controller,
           qrText: zx.text,
           rgb: rgbForZxing,
-          finderPoints: zx.finderPoints,
+          // Tespit küçültülmüş bir kopyada yapıldıysa (bkz. yukarıdaki
+          // "kamera çok donuyor" notu), köşeler TAM çözünürlüklü `rgb`'ye
+          // (color_engine'in homografi/renk örneklemesi bunu kullanıyor)
+          // göre ölçeklenmeli -- yoksa renk yanlış pikselden okunur.
+          finderPoints: _scaleFinderPoints(zx.finderPoints!, 1 / detectionScale),
           mlKitError: _mlKitError,
         );
       }
@@ -333,6 +364,20 @@ class _CameraScannerState extends State<CameraScanner> {
       ),
     );
   }
+}
+
+/// zxing2'nin küçültülmüş tespit kopyasında bulduğu köşeleri `factor`
+/// (`1 / detectionScale`) ile TAM çözünürlüklü görüntüye geri ölçekler —
+/// bkz. `_onFrame`'deki "kamera çok donuyor" notu.
+QrFinderPoints _scaleFinderPoints(QrFinderPoints points, double factor) {
+  ({double x, double y}) scale(({double x, double y}) p) => (x: p.x * factor, y: p.y * factor);
+  final alignment = points.alignment;
+  return QrFinderPoints(
+    topLeft: scale(points.topLeft),
+    topRight: scale(points.topRight),
+    bottomLeft: scale(points.bottomLeft),
+    alignment: alignment == null ? null : scale(alignment),
+  );
 }
 
 InputImage? _toInputImage(CameraImage image, int sensorOrientation) {

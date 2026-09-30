@@ -475,5 +475,56 @@ void main() {
       const points = QrFinderPoints(topLeft: (x: 0, y: 0), topRight: (x: 1, y: 0), bottomLeft: (x: 0, y: 1));
       expect(() => estimateOuterCorners(points, 7), throwsArgumentError);
     });
+
+    test(
+        'KÜÇÜLTÜP-TESPİT-EDİP-GERİ-BÜYÜTME tekniği (30 Eylül, "kamera çok '
+        'donuyor" düzeltmesi) doğruluğu bozmuyor', () {
+      // apps/freshqr/lib/screens/user/widgets/camera_scanner.dart artık
+      // zxing2 TESPİTİNİ küçük bir çalışma kopyasında yapıyor (UI isolate'i
+      // bloke eden senkron piksel işini azaltmak için), bulunan köşeleri
+      // TAM çözünürlüğe geri ölçekliyor. Bu testte AYNI teknik büyük bir
+      // "kamera karesi" simülasyonunda uygulanıyor: temiz etiket büyük bir
+      // tuvale gömülüyor, tuval küçültülüp decode ediliyor, bulunan köşeler
+      // geri ölçekleniyor, TAM çözünürlüklü tuvaldeki GERÇEK köşelerle
+      // karşılaştırılıyor.
+      final clean = _renderReal();
+      const canvasSize = 2400; // gerçekçi büyük bir kamera karesi
+      final offsetX = (canvasSize - clean.width) ~/ 2;
+      final offsetY = (canvasSize - clean.height) ~/ 2;
+
+      final canvas = img.Image(width: canvasSize, height: canvasSize, numChannels: 3);
+      img.fill(canvas, color: img.ColorRgb8(200, 200, 200));
+      img.compositeImage(canvas, clean, dstX: offsetX, dstY: offsetY);
+
+      const maxDimension = 640;
+      final detectionScale = maxDimension / canvasSize;
+      final detectionImg = img.copyResize(
+        canvas,
+        width: (canvasSize * detectionScale).round(),
+        height: (canvasSize * detectionScale).round(),
+      );
+
+      final result = decodeQrZxing(detectionImg);
+      expect(result, isNotNull, reason: 'küçültülmüş kopyada decode başarısız oldu');
+      final smallCorners = estimateOuterCorners(result!.finderPoints!, _matrixSize);
+      final rescaledCorners = [
+        for (final c in smallCorners) [c[0] / detectionScale, c[1] / detectionScale],
+      ];
+
+      final trueCorners = [
+        [(_border * _scale + offsetX).toDouble(), (_border * _scale + offsetY).toDouble()],
+        [((_matrixSize + _border) * _scale + offsetX).toDouble(), (_border * _scale + offsetY).toDouble()],
+        [((_matrixSize + _border) * _scale + offsetX).toDouble(), ((_matrixSize + _border) * _scale + offsetY).toDouble()],
+        [(_border * _scale + offsetX).toDouble(), ((_matrixSize + _border) * _scale + offsetY).toDouble()],
+      ];
+
+      for (var i = 0; i < 4; i++) {
+        // Küçültme/büyütmeden kaynaklanan piksel-düzeyinde bir tolerans --
+        // gerçek köşeden birkaç modülden fazla sapmamalı (aksi halde renk
+        // yanlış pikselden okunurdu).
+        expect(rescaledCorners[i][0], closeTo(trueCorners[i][0], _scale.toDouble()), reason: 'köşe $i x');
+        expect(rescaledCorners[i][1], closeTo(trueCorners[i][1], _scale.toDouble()), reason: 'köşe $i y');
+      }
+    });
   });
 }
