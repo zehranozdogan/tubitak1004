@@ -51,6 +51,7 @@
 // üretiyor — hem ML Kit'e hem `nv21ToRgbImage`'a artık `bytesPerRow: width`
 // veriliyor.
 
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
@@ -60,7 +61,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:image/image.dart' as img;
 import 'package:permission_handler/permission_handler.dart';
-import 'package:qr_layout/qr_layout.dart' show QrFinderPoints, decodeQrZxing;
+import 'package:qr_layout/qr_layout.dart' show QrFinderPoints, ZxingDecodeResult, decodeQrZxing;
 
 import '../../../services/frame_convert.dart';
 import '../../../theme/app_theme.dart';
@@ -138,21 +139,20 @@ class _CameraScannerState extends State<CameraScanner> {
   // maliyet yok, ham deneme genelde yeterli).
   static const int _thoroughZxingEveryNAttempts = 5;
   int _zxingAttemptCount = 0;
-  // GERÇEK CİHAZ HATASI (30 Eylül, "kamera çok donuyor"): `thorough`
-  // ortalama maliyeti düşürse de, HER örneklenen karede zxing2'ye TAM
-  // ÇÖZÜNÜRLÜKLÜ (`ResolutionPreset.high`, gerçek cihazda 1280x720+ olabilir)
-  // bir görüntü veriliyordu -- bu piksel-bazlı Dart döngüleri (NV21->RGB,
-  // RGB->img.Image, zxing2'nin KENDİ binarizasyon/tarama işi) UI ile AYNI
-  // isolate'te SENKRON çalışıyor; ne kadar hızlı olursa olsun bu iş UI
-  // isolate'ini bloke ediyor -- "donma" ortalama hızdan değil, senkron
-  // çalışmanın kendisinden kaynaklanıyor. Çözüm: zxing2 TESPİTİ için
-  // görüntü küçük bir çalışma kopyasına indirgeniyor (`_zxingDetectionMaxDimension`)
-  // -- QR TESPİTİ birkaç piksel/modül yeterliyken, RENK OKUMASI (bkz.
-  // dosya başlığı "Renk okuması için çözünürlük önemli") hâlâ TAM
-  // çözünürlüklü `rgbForZxing`'den yapılıyor, sadece bulunan köşeler ölçek
-  // faktörüyle geri büyütülüyor (bkz. `_onFrame`). Bu, hem her karenin
-  // piksel işi ~O(scale²) azaltıyor hem de daha az frame düşürülmesini
-  // sağlıyor.
+  // GERÇEK CİHAZ HATASI (30 Eylül, "kamera çok donuyor/kasıyor"): zxing2
+  // yolu HER örneklenen karede (ML Kit çöken cihazda) şunu yapıyordu —
+  // hepsi UI ile AYNI isolate'te, SENKRON:
+  //   1. `nv21ToRgbImage` TAM çözünürlükte (1280x720'de ~920 bin ayrı `Rgb`
+  //      nesnesi → her karede onlarca MB çöp, sürekli GC duraklaması),
+  //   2. `rgbToImgImage` ikinci bir tam çözünürlük döngüsü,
+  //   3. ANCAK sonra küçültme, sonra zxing2.
+  // İlk küçültme denemesi (aynı gün) sadece 3. adımı küçülttüğü için hiçbir
+  // şey değiştirmedi. Şimdi: zxing2 için RGB'ye HİÇ çevrilmiyor — doğrudan
+  // Y (parlaklık) düzleminden `step`'te bir örneklenerek küçük bir gri kare
+  // üretiliyor (`nv21LumaDownsampled`, nesne tahsisi yok) ve decode ARKA
+  // PLAN isolate'inde (`Isolate.run`) çalışıyor — UI hiç bloke olmuyor. Tam
+  // çözünürlüklü RGB dönüşümü (renk okuması için gerekli) sadece QR
+  // BULUNDUĞUNDA bir kez yapılıyor.
   static const int _zxingDetectionMaxDimension = 640;
 
   @override
@@ -260,30 +260,22 @@ class _CameraScannerState extends State<CameraScanner> {
         }
       }
 
-      final rgbForZxing = _frameToRgb(image, rotation);
       _zxingAttemptCount++;
       final thorough = _zxingAttemptCount % _thoroughZxingEveryNAttempts == 0;
-      final fullImg = rgbToImgImage(rgbForZxing);
-      final longestSide = fullImg.width > fullImg.height ? fullImg.width : fullImg.height;
-      final detectionScale = longestSide > _zxingDetectionMaxDimension ? _zxingDetectionMaxDimension / longestSide : 1.0;
-      final detectionImg = detectionScale == 1.0
-          ? fullImg
-          : img.copyResize(
-              fullImg,
-              width: (fullImg.width * detectionScale).round(),
-              height: (fullImg.height * detectionScale).round(),
-            );
-      final zx = decodeQrZxing(detectionImg, thorough: thorough);
+      final step = detectionStep(image.width, image.height, _zxingDetectionMaxDimension);
+      final luma = _lumaFrame(image, rotation, step);
+      final zx = await _decodeOffMainIsolate(luma, thorough);
+      if (_done || !mounted) return;
       if (zx != null && zx.finderPoints != null) {
         await _finish(
           controller,
           qrText: zx.text,
-          rgb: rgbForZxing,
-          // Tespit küçültülmüş bir kopyada yapıldıysa (bkz. yukarıdaki
-          // "kamera çok donuyor" notu), köşeler TAM çözünürlüklü `rgb`'ye
-          // (color_engine'in homografi/renk örneklemesi bunu kullanıyor)
-          // göre ölçeklenmeli -- yoksa renk yanlış pikselden okunur.
-          finderPoints: _scaleFinderPoints(zx.finderPoints!, 1 / detectionScale),
+          // Renk okuması için TAM çözünürlüklü RGB — sadece QR bulunduğunda,
+          // bir kez (bkz. `_zxingDetectionMaxDimension` notu).
+          rgb: _frameToRgb(image, rotation),
+          // Tespit küçük karede yapıldı; köşeler TAM çözünürlüklü `rgb`'ye
+          // göre ölçeklenmeli — yoksa renk yanlış pikselden okunur.
+          finderPoints: _scaleFinderPoints(zx.finderPoints!, step.toDouble()),
           mlKitError: _mlKitError,
         );
       }
@@ -295,6 +287,18 @@ class _CameraScannerState extends State<CameraScanner> {
     } finally {
       _busy = false;
     }
+  }
+
+  /// zxing2 tespiti için küçük gri kare — SADECE parlaklık düzleminden
+  /// (Android: NV21'in Y düzlemi, kendi satır adımıyla; iOS: BGRA).
+  LumaFrame _lumaFrame(CameraImage image, int rotation, int step) {
+    final plane = image.planes.first;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return nv21LumaDownsampled(plane.bytes, image.width, image.height,
+          bytesPerRow: plane.bytesPerRow, step: step, rotation: rotation);
+    }
+    return bgraLumaDownsampled(plane.bytes, image.width, image.height,
+        bytesPerRow: plane.bytesPerRow, step: step, rotation: rotation);
   }
 
   RgbImage _frameToRgb(CameraImage image, int rotation) {
@@ -366,9 +370,25 @@ class _CameraScannerState extends State<CameraScanner> {
   }
 }
 
-/// zxing2'nin küçültülmüş tespit kopyasında bulduğu köşeleri `factor`
-/// (`1 / detectionScale`) ile TAM çözünürlüklü görüntüye geri ölçekler —
-/// bkz. `_onFrame`'deki "kamera çok donuyor" notu.
+/// zxing2 decode'unu ARKA PLAN isolate'inde çalıştırır — UI isolate'i
+/// (kamera önizlemesi) bloke olmaz. Üst düzey fonksiyon: `Isolate.run`'a
+/// verilen closure State'i (`this`) yakalamamalı, sadece gönderilebilir
+/// veriyi (bayt dizisi + sayılar) taşımalı.
+Future<ZxingDecodeResult?> _decodeOffMainIsolate(LumaFrame luma, bool thorough) {
+  return Isolate.run(() {
+    final frame = img.Image.fromBytes(
+      width: luma.width,
+      height: luma.height,
+      bytes: luma.rgb.buffer,
+      numChannels: 3,
+    );
+    return decodeQrZxing(frame, thorough: thorough);
+  });
+}
+
+/// zxing2'nin küçük tespit karesinde bulduğu köşeleri `factor` (= atlama
+/// adımı) ile TAM çözünürlüklü görüntüye geri ölçekler — bkz. `_onFrame`'deki
+/// "kamera çok donuyor" notu.
 QrFinderPoints _scaleFinderPoints(QrFinderPoints points, double factor) {
   ({double x, double y}) scale(({double x, double y}) p) => (x: p.x * factor, y: p.y * factor);
   final alignment = points.alignment;
