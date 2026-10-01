@@ -8,6 +8,7 @@
 
 import 'package:color_engine/color_engine.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 
 import '../../../theme/app_theme.dart';
 import '../../../widgets/kv_row.dart';
@@ -132,6 +133,24 @@ class _ResultViewState extends State<ResultView> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (widget.usedDecoder != null) KvRow('Okuyucu', widget.usedDecoder!),
+                // GEÇİCİ (teşhis amaçlı, 1 Ekim): ML Kit çökme metni uzun ve
+                // telefonda elle seçilemiyor — panoya kopyalayıp dışarı
+                // aktarabilmek için. ML Kit sorunu kapanınca kaldırılacak.
+                if (widget.usedDecoder != null && widget.usedDecoder!.contains('ML Kit çöktü'))
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: widget.usedDecoder!));
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Hata metni panoya kopyalandı')),
+                        );
+                      },
+                      icon: const Icon(Icons.copy, size: 18),
+                      label: const Text('Hata metnini kopyala'),
+                    ),
+                  ),
                 MetricBar(label: 'Güven skoru', value: result.confidence),
                 KvRow('ΔE', result.deltaE != null ? result.deltaE!.toStringAsFixed(2) : '—'),
                 KvRow(
