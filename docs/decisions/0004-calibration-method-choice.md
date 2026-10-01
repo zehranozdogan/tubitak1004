@@ -173,3 +173,87 @@ karşılaştırması nihai/güvenilir sayılmamalı.
       — sonra B/C, 22 Eylül'deki GERÇEK basılı etiketlerle TEKRAR test
       edilmeli (bu düzeltmeden önceki A/B/C karşılaştırması B/C için
       güvenilmez olabilir, bkz. yukarı).
+- [x] **(30 Eylül)** Canlı kamerada ışık etkisi ölçüldü — bkz.
+      `tests/device/results_2026-09-30_isik_etkisi.md`. **Bu dosyadaki
+      TÜM A/B/C karşılaştırmalarını doğrudan ilgilendiriyor**, aşağıya
+      bakınız.
+- [ ] **(30 Eylül'den sonra)** A/B/C karşılaştırması **kontrollü ışıkta**
+      tekrarlanmalı — aksi halde ölçülen şey yöntem farkı değil ışık farkı
+      olabilir.
+
+## ⚠️ ÜRETİCİ/OKUYUCU UYUMSUZLUĞU (30 Eylül) — 30 Eylül turu geçersiz
+
+Aynı payload için **Python ve Dart motorları farklı QR deseni üretiyor**
+(sürüm/matris/ECC aynı, muhtemelen mask pattern farklı). Reaktif hücre
+konumları yalnızca %21 örtüşüyor. 30 Eylül canlı kamera turunda kullanılan
+etiketler Python ile üretilmiş, okuyucu ise Dart — yani o turun tamamı
+uyumsuz bir zeminde yapıldı (ayrıntı:
+`tests/device/results_2026-09-30_isik_etkisi.md` başındaki uyarı).
+
+Dart üretimi etiketlerle aynı okuyucu, **A/B/C'nin dokuzunda da** doğru
+sonuç ve **güven skoru 1.00** veriyor (kamerasız, doğrudan PNG'den).
+
+**Alınan karar (30 Eylül):** etiketler **yalnızca Dart motoruyla**
+üretilecek — ürün zaten Flutter/Dart, uygulama hem üretiyor hem okuyor,
+yani kendi içinde tutarlı. Python tarafı referans/prototip olarak kalıyor,
+**gerçek etiket üretmeyecek**. Dolayısıyla iki motorun farklı QR üretmesi
+düzeltilmesi gereken bir hata olarak DEĞİL, bilinen ve kabul edilen bir
+ayrışma olarak kaydediliyor.
+
+Bundan çıkan iki pratik kural:
+
+1. **Motorlar arası etiket alışverişi yapılmaz.** Python ile üretilmiş bir
+   etiket Flutter uygulamasıyla okunamaz (ve tersi). Test etiketleri
+   `packages_dart/label_export/tool/generate_calibration_labels.dart`
+   ile üretilir.
+2. **A/B/C karşılaştırması Dart üretimi etiketlerle sıfırdan
+   tekrarlanmalı** — bu dosyadaki 30 Eylül turu geçersiz.
+
+**Açık kalan risk:** eşleşmeyen bir etiket bir şekilde okutulursa
+uygulama bunu fark etmez — "kendinden emin ama yanlış" sonuç verir (iki
+gün boyunca yaşanan tam olarak buydu). Devrim'in `refineQrCorners`'ındaki
+eşleşme-oranı kontrolü bunu yakalıyordu ama performans nedeniyle geri
+alındı (e6a80a3 → 443ba8e). Sadece o kontrolü (refine olmadan) geri
+getirmek ucuz bir güvenlik ağı olurdu.
+
+Not: mükemmel (sentetik) görüntüde üç yöntem de **birebir aynı** sonucu
+veriyor (ΔE 0.42/2.08/2.09) — kalibrasyonun düzeltecek bir şeyi olmadığı
+için. Yani **A/B/C karşılaştırması sentetik görüntüyle YAPILAMAZ**,
+yöntemler yalnızca gerçek kamera bozulması altında ayrışır.
+
+### Yapısal gözlem — A'nın referansları içeride, B/C'ninkiler dışarıda
+
+Kalibrasyonun temel varsayımı "referans ile ölçülen hücreler aynı ışığı
+görür". A'nın referansları QR'ın **içinde**, reaktif hücrelerle aynı ışık
+komşuluğunda; B/C'ninkiler etiketin **dış kenarında** — parlamaya ve
+mercek köşe karartmasına (vignetting) daha açık, yani varsayımı ilk bozan
+yer orası. Bu, A lehine "testlerde kazandı"dan daha güçlü, yapısal bir
+gerekçe (henüz kontrollü ölçümle doğrulanmadı).
+
+## AYDINLATMA UYARISI (30 Eylül) — önceki tüm turlar için geçerli
+
+Canlı kamera testinde tek değişken ışık tutularak ölçüldü: **gölgede
+A/B/C'nin ÜÇÜ de doğru sınıflandırdı**; ekrana parlama vururken üç
+yanlış çıktı. Ayrıntı ve sayılar:
+`tests/device/results_2026-09-30_isik_etkisi.md`.
+
+Bunun bu dosya için iki sonucu var:
+
+1. ~~ΔE, güvenilirlik ölçütü olarak kullanılamaz~~ — bu iddianın dayandığı
+   ölçüm (parlamada ΔE=0.73 ile yanlış sonuç) uyumsuz etiketlerle
+   yapıldığı için GEÇERSİZ. Mekanizma teorik olarak makul ama doğru
+   etiketlerle tekrar ölçülmeden iddia edilmemeli.
+2. **Seviyeleri ayıran bilginin %72–96'sı PARLAKLIK farkı** (profilin
+   kendi sayılarından hesaplandı, ölçüme bağlı değil — GEÇERLİ).
+   Aydınlatma hatası da bir parlaklık hatasıdır; yani sinyal ile gürültü
+   aynı eksende. Kalibrasyonun bu projede neden belirleyici olduğunun
+   yapısal açıklaması.
+   **Not:** hata payının "dar" olduğu şeklindeki ilk değerlendirme
+   YANLIŞTI — o da bozuk turun ölçümüne dayanıyordu. Doğru etiketlerle
+   ölçülen hata ΔE 0.42–2.09, seviyeler arası mesafe ise 11–18 ΔE:
+   yaklaşık 10 kat pay var.
+
+Karar üzerindeki etkisi: A hâlâ en sağlam seçenek (bu turda da her iki
+koşulda doğru), ama **B ve C'nin geçmiş turlardaki kötü performansının
+ne kadarı yöntemden, ne kadarı ışıktan** sorusu açık. Nihai karar,
+kontrollü ışıkta yapılmış bir turdan sonra verilmeli.
