@@ -153,6 +153,23 @@ class _CameraScannerState extends State<CameraScanner> {
   // PLAN isolate'inde (`Isolate.run`) çalışıyor — UI hiç bloke olmuyor. Tam
   // çözünürlüklü RGB dönüşümü (renk okuması için gerekli) sadece QR
   // BULUNDUĞUNDA bir kez yapılıyor.
+  //
+  // KÖŞE HASSASİYETİ (30 Eylül, yukarıdaki hız düzeltmesinin GETİRDİĞİ
+  // regresyon — gerçek cihazda A/B/C'nin ÜÇÜ de yanlış sonuç verdi):
+  // küçültülmüş tespit karesi QR'ı ÇÖZMEK için yeterli ama köşeleri RENK
+  // OKUMAK için yeterince hassas DEĞİL. Renk okuması, köşelerden kurulan
+  // homografiyle her modülün merkezini tek tek örnekliyor; köşe hatası
+  // `step` katına çıkınca (üstelik `step`'le piksel atlama, `copyResize`
+  // gibi ortalama almadığı için aliasing de ekliyor) hücreler KOMŞU
+  // modülden okunmaya başlıyor. Ölçülen kanıt: tam çözünürlükte tespit →
+  // 9/9 doğru, `copyResize`→640 → 1 hata, `step` ile seyreltme → hepsi
+  // yanlış. (`frame_convert.dart`'taki "bir modülden çok daha küçük"
+  // varsayımı QR kadrajda küçükken tutmuyor: modül birkaç piksele
+  // inebiliyor.) Düzeltme: tespit küçük karede kalıyor (hız orada
+  // kazanıldı), ama QR BULUNDUĞUNDA köşeler tam çözünürlüklü parlaklık
+  // karesinde bir kez daha aranıp hassaslaştırılıyor (bkz.
+  // `_refineFinderPointsFullRes`) — maliyet kare başına DEĞİL, yalnızca
+  // yakalama anında bir kez.
   static const int _zxingDetectionMaxDimension = 640;
 
   @override
@@ -267,15 +284,20 @@ class _CameraScannerState extends State<CameraScanner> {
       final zx = await _decodeOffMainIsolate(luma, thorough);
       if (_done || !mounted) return;
       if (zx != null && zx.finderPoints != null) {
+        // Köşeleri TAM çözünürlükte yeniden bul (bkz. "KÖŞE HASSASİYETİ"
+        // notu) — küçük kareden ölçeklenen köşeler renk okuması için
+        // yeterince hassas değil. Başarısız olursa ölçeklenmiş köşelere
+        // düşülüyor: yakalamayı ASLA kaybetmiyoruz, en kötü ihtimalle
+        // eski (daha az hassas) davranışa dönmüş oluyoruz.
+        final refined = await _refineFinderPointsFullRes(image, rotation);
+        if (_done || !mounted) return;
         await _finish(
           controller,
           qrText: zx.text,
           // Renk okuması için TAM çözünürlüklü RGB — sadece QR bulunduğunda,
           // bir kez (bkz. `_zxingDetectionMaxDimension` notu).
           rgb: _frameToRgb(image, rotation),
-          // Tespit küçük karede yapıldı; köşeler TAM çözünürlüklü `rgb`'ye
-          // göre ölçeklenmeli — yoksa renk yanlış pikselden okunur.
-          finderPoints: _scaleFinderPoints(zx.finderPoints!, step.toDouble()),
+          finderPoints: refined ?? _scaleFinderPoints(zx.finderPoints!, step.toDouble()),
           mlKitError: _mlKitError,
         );
       }
@@ -286,6 +308,25 @@ class _CameraScannerState extends State<CameraScanner> {
       }
     } finally {
       _busy = false;
+    }
+  }
+
+  /// Yakalama anında (kare başına DEĞİL) köşeleri TAM çözünürlüklü
+  /// parlaklık karesinde yeniden arar — bkz. "KÖŞE HASSASİYETİ" notu.
+  /// `step: 1` ile üretilen kare, `_frameToRgb`'nin çıktısıyla AYNI
+  /// (döndürülmüş) piksel uzayında olduğundan dönen noktalar hiç
+  /// ölçeklenmeden kullanılabilir. Bulamazsa `null` — çağıran küçük
+  /// kareden ölçeklenen köşelere düşer.
+  ///
+  /// `thorough: false` bilinçli: bu kare zaten QR'ı barındırdığı DOĞRULANMIŞ
+  /// ve tam çözünürlükte/keskin — pahalı yedek katmanlar (bozuk görüntüler
+  /// için var) burada gereksiz gecikme demek olurdu.
+  Future<QrFinderPoints?> _refineFinderPointsFullRes(CameraImage image, int rotation) async {
+    try {
+      final zx = await _decodeOffMainIsolate(_lumaFrame(image, rotation, 1), false);
+      return zx?.finderPoints;
+    } catch (_) {
+      return null;
     }
   }
 

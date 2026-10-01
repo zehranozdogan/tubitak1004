@@ -223,6 +223,40 @@ void main() {
       expect(result?.text, _payload);
       expect(result?.finderPoints, isNotNull);
     });
+
+    // KÖŞE HASSASİYETİ (30 Eylül, gerçek cihazda A/B/C'nin ÜÇÜ de yanlış
+    // sonuç verdi — bkz. camera_scanner.dart'taki aynı başlıklı not):
+    // küçültülmüş kare QR'ı ÇÖZMEK için yeterli ama köşeleri RENK OKUMAK
+    // için değil. Yukarıdaki küçültme testinin toleransı 10 piksel = TAM
+    // BİR MODÜL (scale=10) — renk okuması her modülün merkezini tek tek
+    // örneklediği için bu kadarlık bir kayma hücreleri KOMŞU modülden
+    // okutabiliyor. Bu test, yakalama anında kullanılan tam çözünürlüklü
+    // yolun (`_refineFinderPointsFullRes`, step=1) çok daha sıkı bir
+    // toleransı tutturduğunu kanıtlar: 2 piksel = 0.2 modül.
+    test('TAM çözünürlüklü (step=1) tespit, köşeleri 0.2 modül hassasiyetle bulur', () {
+      final f = cameraFrame();
+      final luma = nv21LumaDownsampled(f.nv21, f.width, f.height, bytesPerRow: f.stride, step: 1);
+      expect(luma.width, f.width, reason: 'step=1 tam çözünürlük olmalı');
+      final frame = img.Image.fromBytes(width: luma.width, height: luma.height, bytes: luma.rgb.buffer, numChannels: 3);
+
+      final result = qr_layout.decodeQrZxing(frame, thorough: false);
+      expect(result, isNotNull);
+      expect(result!.text, _payload);
+
+      // step=1 olduğu için ölçekleme YOK — noktalar zaten tam çözünürlüklü
+      // (döndürülmüş) kare uzayında, `_frameToRgb`'nin çıktısıyla aynı.
+      final corners = qr_layout.estimateOuterCorners(result.finderPoints!, 65);
+      final truth = [
+        [f.offX + 40.0, f.offY + 40.0],
+        [f.offX + 690.0, f.offY + 40.0],
+        [f.offX + 690.0, f.offY + 690.0],
+        [f.offX + 40.0, f.offY + 690.0],
+      ];
+      for (var i = 0; i < 4; i++) {
+        expect(corners[i][0], closeTo(truth[i][0], 2), reason: 'köşe $i x');
+        expect(corners[i][1], closeTo(truth[i][1], 2), reason: 'köşe $i y');
+      }
+    });
   });
 }
 
