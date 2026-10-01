@@ -81,6 +81,9 @@ class CameraCapture {
   // için: önceden yutuluyordu (`catch (_)`), "hiç çalışmadı" ötesinde bir
   // bilgi edinilemiyordu. corners doluysa (ML Kit başarılıysa) hep null.
   final String? mlKitError;
+  // QR'ı ML Kit buldu ama köşeler zxing2'den alındı (bkz. _onFrame'deki
+  // "ML Kit köşeleri" notu) — teşhis satırında ayırt edilebilsin diye.
+  final bool detectedByMlKit;
 
   const CameraCapture({
     required this.qrText,
@@ -88,6 +91,7 @@ class CameraCapture {
     this.corners,
     this.finderPoints,
     this.mlKitError,
+    this.detectedByMlKit = false,
   }) : assert((corners == null) != (finderPoints == null), 'corners ile finderPoints\'ten tam olarak biri verilmeli');
 }
 
@@ -236,11 +240,28 @@ class _CameraScannerState extends State<CameraScanner> {
               final points = barcode.cornerPoints;
               if (barcode.format != BarcodeFormat.qrCode || text == null || points.length != 4) continue;
 
+              // ML Kit KÖŞELERİ (1 Ekim, gerçek cihaz): ML Kit R8 düzeltmesiyle
+              // ilk kez çalışınca A (white_black) ve C (multicolor) etiketleri
+              // çoğunlukla YANLIŞ sınıflandı, B (gri yama) doğru kaldı; zxing2
+              // yolunda üçü de çoğunlukla doğruydu. Olası sebep (DOĞRULANMADI):
+              // `cornerPoints` tespit amaçlı yaklaşık bir dörtgen — beyaz
+              // referans finder'ın 1 modüllük halkasından okunduğu için küçük
+              // köşe hatası beyaz/siyah referansı bozuyor; B'nin gri yamalı
+              // gamma düzeltmesi bunu orta tonlarda telafi ediyor. zxing2'nin
+              // finder merkezlerinden kestirdiği köşeler cihazda doğru sonuç
+              // verdi — bu yüzden AYNI karede zxing2 de denenir, bulursa onun
+              // köşeleri kullanılır; bulamazsa ML Kit köşeleriyle devam.
+              final step = detectionStep(image.width, image.height, _zxingDetectionMaxDimension);
+              final zx = await _decodeOffMainIsolate(_lumaFrame(image, rotation, step), true);
+              if (_done || !mounted) return;
+              final zxCorners = zx != null && zx.text == text ? zx.finderPoints : null;
               await _finish(
                 controller,
                 qrText: text,
                 rgb: _frameToRgb(image, rotation),
-                corners: [for (final p in points) [p.x.toDouble(), p.y.toDouble()]],
+                corners: zxCorners == null ? [for (final p in points) [p.x.toDouble(), p.y.toDouble()]] : null,
+                finderPoints: zxCorners == null ? null : _scaleFinderPoints(zxCorners, step.toDouble()),
+                detectedByMlKit: true,
               );
               return;
             }
@@ -322,6 +343,7 @@ class _CameraScannerState extends State<CameraScanner> {
     List<List<double>>? corners,
     QrFinderPoints? finderPoints,
     String? mlKitError,
+    bool detectedByMlKit = false,
   }) async {
     _done = true;
     await controller.stopImageStream();
@@ -332,6 +354,7 @@ class _CameraScannerState extends State<CameraScanner> {
       corners: corners,
       finderPoints: finderPoints,
       mlKitError: mlKitError,
+      detectedByMlKit: detectedByMlKit,
     ));
   }
 
