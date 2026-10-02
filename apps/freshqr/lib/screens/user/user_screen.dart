@@ -158,8 +158,10 @@ class _UserScreenState extends State<UserScreen> {
       case ScanSuccess(:final result, :final labelInfo):
         await _record(result, labelInfo);
         final decoderNote = capture.corners != null
-            ? 'ML Kit'
-            : capture.mlKitError != null
+            ? 'ML Kit (köşeler: ML Kit — zxing2 bu karede bulamadı)'
+            : capture.detectedByMlKit
+                ? 'ML Kit (köşeler: zxing2)'
+                : capture.mlKitError != null
                 ? 'zxing2 (yedek) — ML Kit çöktü: ${capture.mlKitError}'
                 : 'zxing2 (yedek)';
         _runScan(result, labelInfo, decoderNote);
