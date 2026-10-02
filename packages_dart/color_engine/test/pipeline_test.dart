@@ -298,4 +298,83 @@ void main() {
     expect(result.rescanRecommended, isFalse);
     expect(result.freshnessClass, 'fresh');
   });
+
+  // ---- Eşleşme oranı: okunan QR beklenen desene uyuyor mu? ----
+  // 30 Eylül/2 Ekim: başka bir motorla üretilmiş etiket okutulduğunda
+  // hücreler yanlış yerden okunuyor ve uygulama KENDİNDEN EMİN YANLIŞ
+  // cevap veriyordu. Bu kontrol tam olarak onu yakalar.
+
+  test('eşleşme oranı: beklenen desen görüntüyle UYUŞUYORSA sonuç üretilir', () {
+    final image = _buildCanonicalLikePhoto(
+      background: const Rgb(200, 200, 200), // açık -> "light" ölçülür
+      modules: baseModules(freshRgb),
+    );
+    // Arka plan açık olduğu için beklenen desen de tamamen AÇIK (0).
+    final beklenen = List.generate(_matrixSize, (_) => List.filled(_matrixSize, 0));
+    final result = analyzeFrame(
+      image,
+      sensorProfile: _profile(scalePoints: scalePoints, hasClassThresholds: true),
+      layoutVersion: _layout(sensorModules: sensorModules),
+      qrCorners: _identityCorners(),
+      expectedMatrix: beklenen,
+    );
+    expect(result.rescanRecommended, isFalse);
+    expect(result.freshnessClass, 'fresh');
+  });
+
+  test('eşleşme oranı: desen UYUŞMUYORSA yeniden tara (sessiz yanlış sonuç YOK)', () {
+    final image = _buildCanonicalLikePhoto(
+      background: const Rgb(200, 200, 200), // açık ölçülür
+      modules: baseModules(freshRgb),
+    );
+    // ...ama beklenen desen tamamen KOYU (1) -> neredeyse hiçbir modül uymaz.
+    final beklenen = List.generate(_matrixSize, (_) => List.filled(_matrixSize, 1));
+    final result = analyzeFrame(
+      image,
+      sensorProfile: _profile(scalePoints: scalePoints, hasClassThresholds: true),
+      layoutVersion: _layout(sensorModules: sensorModules),
+      qrCorners: _identityCorners(),
+      expectedMatrix: beklenen,
+    );
+    expect(result.rescanRecommended, isTrue);
+    expect(result.notes.any((n) => n.contains('QR deseni beklenenle uyuşmuyor')), isTrue);
+    // KRİTİK: yanlış da olsa bir sınıf ÜRETİLMEMELİ (§7.1 dürüst belirsizlik).
+    expect(result.freshnessClass, isNull);
+  });
+
+  // ---- Parlama/doyma ----
+  // ΔE bu durumu yakalamaz (parlamalı YANLIŞ okuma ΔE=0.73 verebildi,
+  // gölgedeki DOĞRU okuma ΔE=9.69) — gösterge doyma oranı.
+
+  test('parlama: reaktif hücreler beyaza yanmışsa yeniden tara', () {
+    final image = _buildCanonicalLikePhoto(
+      background: const Rgb(128, 128, 128),
+      modules: baseModules(const Rgb(255, 255, 255)), // hücreler doymuş
+    );
+    final result = analyzeFrame(
+      image,
+      sensorProfile: _profile(scalePoints: scalePoints, hasClassThresholds: true),
+      layoutVersion: _layout(sensorModules: sensorModules),
+      qrCorners: _identityCorners(),
+    );
+    expect(result.rescanRecommended, isTrue);
+    expect(result.notes.any((n) => n.contains('Parlama')), isTrue);
+    expect(result.freshnessClass, isNull);
+  });
+
+  test('parlama: normal parlaklıktaki hücreler yanlışlıkla elenmez', () {
+    // En AÇIK gerçek profil noktası bile (214,205,196) 250'nin altında.
+    final image = _buildCanonicalLikePhoto(
+      background: const Rgb(128, 128, 128),
+      modules: baseModules(const Rgb(214, 205, 196)),
+    );
+    final result = analyzeFrame(
+      image,
+      sensorProfile: _profile(scalePoints: scalePoints, hasClassThresholds: true),
+      layoutVersion: _layout(sensorModules: sensorModules),
+      qrCorners: _identityCorners(),
+    );
+    expect(result.rescanRecommended, isFalse);
+    expect(result.notes.any((n) => n.contains('Parlama')), isFalse);
+  });
 }

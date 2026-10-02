@@ -101,6 +101,16 @@ const double _spreadFloorDeltaE = 4.0;
 // gerçek fotoğraflarla aşırı sert bulunup geri alınmıştı).
 const double _cornerCvNoteThreshold = 0.25;
 
+// Okunan QR'ın, payload'dan yeniden üretilen desene uyma oranı için alt
+// sınır (bkz. analyzeFrame içindeki "eşleşme oranı" bloğu).
+const double _patternMatchMinRate = 0.8;
+
+// Reaktif hücrelerin DOYMA (clipping) kontrolü için sınırlar — bkz.
+// analyzeFrame içindeki "parlama/doyma" bloğu.
+const double _clipChannelLevel = 250.0;
+const double _clipRescanFraction = 0.5;
+const double _clipNoteFraction = 0.2;
+
 // BGR dönüşümü GEREKMEZ (bkz. dosya başlığı sapma #2) — Python'daki
 // _REFERENCE_TRUE_COLORS_BGR'nin tersine, burada doğrudan gerçek RGB.
 Map<String, Rgb> _referenceTrueColorsRgb() {
@@ -166,6 +176,7 @@ ColorEngineResult analyzeFrame(
   required schema.LayoutVersionData layoutVersion,
   required List<List<double>> qrCorners,
   List<int>? sensorModuleBits,
+  List<List<int>>? expectedMatrix,
 }) {
   // profile_schema'nın (tam, doğrulanmış) tiplerinden bu fonksiyonun
   // ihtiyaç duyduğu değerleri türet (bkz. dosya başlığı sapma #4).
@@ -222,6 +233,48 @@ ColorEngineResult analyzeFrame(
   final whiteRef = sampleRef(whitePos);
   final blackRef = sampleRef(blackPos);
 
+  // OKUNAN QR, BEKLENEN DESENE UYUYOR MU? (eşleşme oranı)
+  //
+  // Okuyucu, reaktif hücre konumlarını payload'dan QR'ı YENİDEN ÜRETEREK
+  // buluyor (bkz. 0006). Eğer elimizdeki görüntüdeki QR, yeniden ürettiğimiz
+  // desenle uyuşmuyorsa hücreleri YANLIŞ YERDEN okuruz ve sonuç sessizce
+  // yanlış çıkar — 30 Eylül/2 Ekim'de tam olarak bu yaşandı (Python ile
+  // üretilmiş etiketler Dart okuyucuyla okunduğunda hücrelerin yalnızca
+  // %21'i örtüşüyordu, ama uygulama kendinden emin yanlış cevap veriyordu).
+  //
+  // Eşik 0.8: ölçülen iki gerçek veri noktası arasında geniş boşluk var —
+  // doğru etikette ~1.00, uyumsuz etikette ~0.55. Tahmin değil.
+  //
+  // Maliyet: her 2 modülde bir örnekleniyor (istatistik için fazlasıyla
+  // yeterli) ve ARAMA YAPILMIYOR — pahalı olan köşe arama/ince ayardı
+  // (bkz. grid_refine denemesi, e6a80a3 -> 443ba8e), bu kontrol değil.
+  if (expectedMatrix != null) {
+    final atla = <({int col, int row})>{...sensorModulesCells, ...referenceRegionsCells.values};
+    final esik = (_channelMean(whiteRef) + _channelMean(blackRef)) / 2.0;
+    var toplam = 0, uyan = 0;
+    for (var r = 0; r < layoutVersion.matrixSize; r += 2) {
+      for (var c = 0; c < layoutVersion.matrixSize; c += 2) {
+        if (atla.contains((row: r, col: c))) continue;
+        if (r >= expectedMatrix.length || c >= expectedMatrix[r].length) continue;
+        final patch = sampleModuleRoi(canonical, r, c, scale: _canonicalScale, border: _canonicalBorder);
+        final koyuOlcum = _channelMean(robustModuleColor(patch)) < esik;
+        final koyuBeklenen = expectedMatrix[r][c] != 0;
+        toplam++;
+        if (koyuOlcum == koyuBeklenen) uyan++;
+      }
+    }
+    if (toplam > 0) {
+      final oran = uyan / toplam;
+      if (oran < _patternMatchMinRate) {
+        return _rescanResult(
+          quality,
+          'QR deseni beklenenle uyuşmuyor (modüllerin %${(oran * 100).round()}\'i uydu); '
+          'etiket bu uygulamanın ürettiğinden farklı olabilir ya da kadraj/odak bozuk.',
+        );
+      }
+    }
+  }
+
   var code = sensorProfile.calibrationMethod.code;
   final trueColors = _referenceTrueColorsRgb();
 
@@ -276,12 +329,49 @@ ColorEngineResult analyzeFrame(
   // 4-5. Reaktif hücrelerin ROI örneklemesi (parlama/gölge elenmiş median).
   final moduleReadings = <ModuleReading>[];
   final rgbSamples = <Rgb>[];
+  // PARLAMA/DOYMA (clipping) sayacı — DÜZELTİLMEMİŞ (canonical) görüntüden
+  // ölçülür, çünkü doyma yakalanan verinin özelliğidir; kalibrasyon onu
+  // geri getiremez. Reaktif hücrenin en açık profil noktası P1 bile
+  // (214,205,196) 250'nin altında; bir reaktif hücre 250+ okunuyorsa o
+  // hücrenin renk bilgisi YANMIŞ demektir (beyaz REFERANS 255 olabilir,
+  // o normaldir — bu yüzden sadece reaktif hücrelere bakılıyor).
+  var doymusHucre = 0;
   for (final (:row, :col) in sensorModulesCells) {
+    final hamPatch = sampleModuleRoi(canonical, row, col, scale: _canonicalScale, border: _canonicalBorder);
+    final ham = robustModuleColor(hamPatch);
+    if (ham.r >= _clipChannelLevel || ham.g >= _clipChannelLevel || ham.b >= _clipChannelLevel) {
+      doymusHucre++;
+    }
     final patch = sampleModuleRoi(corrected, row, col, scale: _canonicalScale, border: _canonicalBorder);
     final rgb = robustModuleColor(patch);
     rgbSamples.add(rgb);
     final lab = rgbToLab(rgb);
     moduleReadings.add(ModuleReading(module: (row, col), normalizedColor: rgb, lab: lab));
+  }
+
+  // Doyma oranı yüksekse ölçüm kurtarılamaz: açık tonlar birbirinden
+  // ayrışamaz hale gelir. ΔE bu durumu YAKALAMAZ — ölçülen renk tesadüfen
+  // bir profil noktasının üstüne düşüp "mükemmel eşleşme" görüntüsü
+  // verebilir (30 Eylül: parlamalı YANLIŞ okuma ΔE=0.73, gölgedeki DOĞRU
+  // okuma ΔE=9.69). Bu yüzden gösterge ΔE değil, doyma oranı.
+  //
+  // Eşikler ilke bazlı, ince ayar DEĞİL (daha önce tahminle konan bir eşik
+  // "aşırı sert" bulunup geri alınmıştı): yarısı yanmışsa ölçüm nesnel
+  // olarak yok olmuştur; %20'de ise yalnızca bilgi notu düşülür. Gerçek
+  // parlama fotoğraflarıyla kalibre edilmeli.
+  final doymaOrani = sensorModulesCells.isEmpty ? 0.0 : doymusHucre / sensorModulesCells.length;
+  if (doymaOrani >= _clipRescanFraction) {
+    return _rescanResult(
+      quality,
+      'Parlama: reaktif hücrelerin %${(doymaOrani * 100).round()}\'i doymuş (beyaza yanmış); '
+      'renk bilgisi kayboldu. Gölgede ya da farklı açıyla tekrar tarayın.',
+    );
+  }
+  if (doymaOrani >= _clipNoteFraction) {
+    notes.add(
+      'Reaktif hücrelerin %${(doymaOrani * 100).round()}\'i doymaya yakın (parlama olabilir); '
+      'sonuç güvenilirliği düşük olabilir.',
+    );
   }
 
   double medianOf(Iterable<double> values) {

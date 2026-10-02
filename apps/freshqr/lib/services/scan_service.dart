@@ -118,6 +118,11 @@ Future<ScanOutcome> analyzeCapturedLabel({
     layoutVersion: resolved.layout,
     qrCorners: resolvedCorners,
     sensorModuleBits: bits,
+    // Okunan QR'ın beklenen desene uyup uymadığı burada kontrol ediliyor
+    // (bkz. pipeline.dart "eşleşme oranı"): etiket bu uygulamanın
+    // ürettiğinden farklıysa hücreler yanlış yerden okunur ve sonuç
+    // sessizce yanlış çıkar. `matrix` zaten yukarıda üretiliyor.
+    expectedMatrix: matrix,
   );
 
   return ScanSuccess(

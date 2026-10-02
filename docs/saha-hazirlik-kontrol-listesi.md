@@ -57,21 +57,29 @@ baskıda** sıfırdan tekrarlanmalı. Önceki tüm turlar geçersiz:
 Test etiketleri: `dart run tool/generate_calibration_labels.dart`
 (`packages_dart/label_export` içinden).
 
-### B2. Işık/parlama tespiti — "kendinden emin yanlış cevap" riski
+### B2. ✅ YAPILDI (2 Ekim) — Işık/parlama tespiti
 Parlama altında ölçüm bozuluyor ama uygulama bunu fark etmiyor; üstelik
 ΔE güvenilir bir gösterge değil (parlamalı yanlış okuma ΔE=0.73 verebildi).
 Mevcut köşe-tutarlılığı (cv) göstergesi doygunluğu yakalamıyor.
 
-Gereken: **beyaz referans doygunluk (clipping) kontrolü** →
-`rescanRecommended`. Eşik gerçek fotoğraflarla ölçülerek konmalı.
-Rapor §7.1 "dürüst belirsizlik" ilkesinin gereği.
+**Eklendi:** reaktif hücrelerin doyma (clipping) oranı ölçülüyor —
+DÜZELTİLMEMİŞ görüntüden, çünkü doyma yakalanan verinin özelliği,
+kalibrasyon geri getiremez. Beyaz REFERANS 255 olabilir (normaldir), bu
+yüzden sadece reaktif hücrelere bakılıyor: en açık profil noktası bile
+(214,205,196) 250'nin altında, dolayısıyla 250+ okunan bir reaktif hücre
+yanmış demektir. Yarısı yanmışsa → yeniden tara; %20'de bilgi notu.
 
-### B3. Eşleşmeyen etiket tespiti geri gelmeli
-Devrim'in `refineQrCorners`'ındaki eşleşme-oranı kontrolü, okunan QR ile
-yeniden üretilen desenin uyuşmadığını yakalıyordu — iki günlük sessiz
-yanlış sonucu yakalayan şey oydu. Performans nedeniyle geri alındı
-(`e6a80a3` → `443ba8e`). **Refine'ın tamamı olmadan sadece eşleşme-oranı
-uyarısı** ucuz bir güvenlik ağı olur.
+Eşikler ilke bazlı (ince ayar değil): yarısı yanmışsa ölçüm nesnel olarak
+yok olmuştur. **Gerçek parlama fotoğraflarıyla ince ayar hâlâ yapılmalı.**
+
+### B3. ✅ YAPILDI (2 Ekim) — Eşleşmeyen etiket tespiti
+**Eklendi:** okunan QR, payload'dan yeniden üretilen desenle
+karşılaştırılıyor; uyum %80'in altındaysa sonuç ÜRETİLMİYOR, "yeniden
+tara" deniyor. Pahalı olan köşe arama/ince ayardı (`e6a80a3` → `443ba8e`),
+bu kontrol değil — arama yok, her 2 modülde bir tek örnekleme var.
+
+Eşik tahmin değil: doğru etikette ~1.00, uyumsuz etikette ~0.55 ölçüldü.
+Dokuz gerçek etikette yanlış alarm vermediği doğrulandı.
 
 ### B4. Cihaz çeşitliliği
 Yalnızca 2 Android cihazda test edildi (Samsung Galaxy S21, Redmi Note 9).
@@ -136,8 +144,9 @@ Python bir gün gerçek etiket üretecekse bu düzeltilmeli.
 | Kamera / QR okuma | ✅ ML Kit + zxing2 yedek, donma yok |
 | Etiket üretimi | ✅ Dart, okuyucuyla uyumlu |
 | Kalite kapısı | ✅ Uygulanıyor (`min_quality_score`) |
+| Eşleşmeyen etiket koruması | ✅ Var |
 | Kalibrasyon yöntemi | ⚠️ Karar verilmedi (0004) |
-| Parlama/ışık koruması | ❌ Yok |
+| Parlama/ışık koruması | ✅ Var (ince ayar bekliyor) |
 | Tazelik eşikleri | ❌ Yok — **saha engeli** |
 | Gerçek mürekkep/profil | ❌ Yok — **saha engeli** |
 | İmzalama | ❌ Debug anahtarı |
