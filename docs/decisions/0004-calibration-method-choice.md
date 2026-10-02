@@ -181,6 +181,71 @@ karşılaştırması nihai/güvenilir sayılmamalı.
       tekrarlanmalı — aksi halde ölçülen şey yöntem farkı değil ışık farkı
       olabilir.
 
+## 🔴 KRİTİK (2 Ekim) — cihazda B ve C HİÇ ÇALIŞMAMIŞ, hepsi A ile okunmuş
+
+Kalibrasyon yöntemi, tasarım gereği **sensör profilinin** özelliğidir
+(etiketin değil): okuyucu, payload'daki `sensor_profile_id` ile PAKETLİ
+profili yükleyip onun `calibration_method.code`'unu uygular.
+
+Flutter uygulamasında paketli iki profil vardı ve **ikisi de
+`white_black`**. Dolayısıyla B/C yamaları basılsa bile okuyucu üçünü de
+**A (white_black)** ile okuyordu. Bu bir "yedeğe düşme" değildi — profil
+gerçekten white_black istiyordu — bu yüzden **hiçbir uyarı notu da
+çıkmıyordu**. Sessizce A uygulanıyordu.
+
+**Sonuç: cihaz üzerinde bugüne kadar yapılan hiçbir A/B/C karşılaştırması
+B ve C'yi hiç test etmemiş.** Bu, Python/Dart etiket uyumsuzluğundan
+BAĞIMSIZ, ikinci bir geçersizlik sebebi.
+
+Python tarafı etkilenmedi (profil doğrudan veriliyordu, ID ile aranmıyordu)
+— 22 Eylül kağıt turunda B'nin gama patlamasının görülebilmesinin sebebi
+bu. Ancak o tur da B/C için ayrıca şüpheli: kenar yaması border hatası
+(28 Eylül'de Dart'ta düzeltildi, Python'da hâlâ açık) o turda etkindi.
+
+### Düzeltme (2 Ekim)
+Üç profil varyantı oluşturulup uygulamaya paketlendi — tek farkları
+kalibrasyon yöntemi:
+
+| Profil | `calibration_method.code` |
+|---|---|
+| `GENIPIN_PUTRESIN_v2_A` | `white_black` |
+| `GENIPIN_PUTRESIN_v2_B` | `white_gray_black` |
+| `GENIPIN_PUTRESIN_v2_C` | `multicolor_patch` |
+
+Etiket üreticisi (`packages_dart/label_export/tool/
+generate_calibration_labels.dart`) artık etiketi, uygulamanın okuyacağı
+profil DOSYASININ kendisiyle üretiyor — basılan yama ile uygulanan yöntem
+bir daha çelişemez.
+
+### Doğrulama
+Kusursuz (sentetik) görüntüde A ve C hâlâ AYNI sonucu verir — bu beklenen
+davranış: referanslar tam doğru okunduğunda C'nin uydurduğu dönüşüm birim
+dönüşüm olur, A da öyle. B farklıdır çünkü gama üssünü gri yamadan türetir.
+
+Gerçekçi bozulma (sarımsı ışık + gama kayması) altında aynı etiket:
+
+| Yöntem | Referans noktası | Kalan ΔE |
+|---|---|---|
+| A (white_black) | 2 | 4.741 |
+| B (white_gray_black) | 3 | 2.449 |
+| C (multicolor_patch) | 6 | **1.870** |
+
+Üçü de sınıfı doğru buldu; kalan hata referans sayısıyla ters orantılı —
+teorinin beklediği yön.
+
+### Bunun karar üzerindeki etkisi
+Bu dosyadaki **"A açık ara kazanıyor" sonucu artık desteklenmiyor.**
+A lehine toplanan cihaz verisinin tamamı, B ve C'nin hiç çalışmadığı
+turlardan geliyor. İlk sentetik işaret bile tersini söylüyor (C en iyi
+düzeltmeyi yapıyor).
+
+Karar, kontrollü ışıkta ve gerçek baskıda yapılacak YENİ bir turdan önce
+verilmemeli. Karşı argüman hâlâ geçerli ve ölçülmeli: A'nın referansları
+QR'ın içinde, B/C'ninkiler dış kenarda — parlama/vignetting'e daha açık.
+Yani "daha çok referans = daha iyi düzeltme" ile "kenardaki referans daha
+kırılgan" etkileri ters yönde çalışıyor; hangisinin baskın olduğu ancak
+gerçek ölçümle belirlenir.
+
 ## ⚠️ ÜRETİCİ/OKUYUCU UYUMSUZLUĞU (30 Eylül) — 30 Eylül turu geçersiz
 
 Aynı payload için **Python ve Dart motorları farklı QR deseni üretiyor**

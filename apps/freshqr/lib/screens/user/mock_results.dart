@@ -11,8 +11,18 @@ class LabelInfo {
   final String productType;
   final String productId;
   final String productionDate;
+  // Hangi kalibrasyon yönteminin uygulandığı (sensor_profile'dan gelir —
+  // etiketten DEĞİL, bkz. docs/decisions/0004 "KRİTİK (2 Ekim)"). Sonuç
+  // ekranındaki teknik detaylarda gösteriliyor: A/B/C karşılaştırmasında
+  // doğru yöntemin uygulandığı cihazda gözle doğrulanabilsin diye.
+  final String? calibrationMethod;
 
-  const LabelInfo({required this.productType, required this.productId, required this.productionDate});
+  const LabelInfo({
+    required this.productType,
+    required this.productId,
+    required this.productionDate,
+    this.calibrationMethod,
+  });
 }
 
 const mockLabelInfo = LabelInfo(productType: 'Levrek', productId: 'TR45678', productionDate: '10.09.2026');

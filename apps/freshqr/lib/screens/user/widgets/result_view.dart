@@ -133,6 +133,8 @@ class _ResultViewState extends State<ResultView> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (widget.usedDecoder != null) KvRow('Okuyucu', widget.usedDecoder!),
+                if (widget.labelInfo.calibrationMethod != null)
+                  KvRow('Kalibrasyon', widget.labelInfo.calibrationMethod!),
                 // GEÇİCİ (teşhis amaçlı, 1 Ekim): ML Kit çökme metni uzun ve
                 // telefonda elle seçilemiyor — panoya kopyalayıp dışarı
                 // aktarabilmek için. ML Kit sorunu kapanınca kaldırılacak.

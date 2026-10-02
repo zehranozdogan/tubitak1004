@@ -126,6 +126,7 @@ Future<ScanOutcome> analyzeCapturedLabel({
       productType: _titleCase(payload.productType),
       productId: payload.productId,
       productionDate: _displayDate(payload.productionDate),
+      calibrationMethod: loaded.profile.calibrationMethod.code,
     ),
   );
 }

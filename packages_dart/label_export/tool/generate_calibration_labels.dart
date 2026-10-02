@@ -2,34 +2,36 @@
 // DART motoruyla (Python `label_export` ile DEĞİL).
 //
 // Neden Dart: etiketleri OKUYAN motor (apps/freshqr) Dart. Üreten ile
-// okuyanın aynı kod olması, iki motor arasındaki olası bir ayrışmanın
-// kalibrasyon testini kirletmesini engeller — özellikle Python ile Dart'ın
-// BİLEREK ayrıştığı bir nokta varken (kenar yaması border düzeltmesi
-// 28 Eylül'de Dart'a uygulandı, Python'a bilerek uygulanmadı; bkz.
-// docs/decisions/0004 son maddeler).
+// okuyanın aynı kod olması şart — iki motor aynı payload için FARKLI QR
+// deseni üretiyor (bkz. docs/decisions/0004, "ÜRETİCİ/OKUYUCU UYUMSUZLUĞU").
+//
+// Neden profil DOSYADAN okunuyor: kalibrasyon yöntemi, tasarım gereği
+// sensör profilinin özelliği (etiketin değil). Okuyucu bu yöntemi
+// payload'daki `sensor_profile_id` ile paketli profilden alır. Üretici
+// başka bir yöntem varsayarsa, basılan yamalar ile okuyucunun uyguladığı
+// yöntem ÇELİŞİR — 2 Ekim'de tam olarak bu oldu: B/C etiketleri basıldı
+// ama okuyucu üçünü de `white_black` (A) ile okudu, çünkü paketli profil
+// öyle diyordu. Bu yüzden burada etiket, uygulamanın okuyacağı profil
+// dosyasının ta kendisiyle üretiliyor.
 //
 // Kullanım (packages_dart/label_export içinden):
 //   dart run tool/generate_calibration_labels.dart [çıktı_dizini]
 // Varsayılan çıktı: ~/Desktop/QR_Test_Dart
-//
-// Python karşılığı `tests/device/` altındaki baskı-testi scriptleriydi;
-// bu, onun Dart motorunu kullanan eşdeğeri.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:label_export/label_export.dart';
 
-/// Rapor §6.1'deki üç kalibrasyon adayı. A referans yaması kullanmaz
-/// (profil verilmez -> QR-içi beyaz/siyah), B/C kenar yaması bastırır.
-const _methods = <String, Map<String, dynamic>?>{
-  'A': null,
-  'B': {
-    'calibration_method': {'code': 'white_gray_black'},
-  },
-  'C': {
-    'calibration_method': {'code': 'multicolor_patch'},
-  },
+/// Rapor §6.1'deki üç kalibrasyon adayı — her biri kendi profil
+/// varyantına işaret eder (bkz. apps/freshqr/assets/reference/).
+const _profilIdleri = <String, String>{
+  'A': 'GENIPIN_PUTRESIN_v2_A',
+  'B': 'GENIPIN_PUTRESIN_v2_B',
+  'C': 'GENIPIN_PUTRESIN_v2_C',
 };
+
+const _profilDizini = '../../apps/freshqr/assets/reference';
 
 Future<void> main(List<String> args) async {
   final outRoot = Directory(
@@ -37,25 +39,34 @@ Future<void> main(List<String> args) async {
   );
   if (await outRoot.exists()) await outRoot.delete(recursive: true);
 
-  for (final entry in _methods.entries) {
-    final letter = entry.key;
+  for (final entry in _profilIdleri.entries) {
+    final harf = entry.key;
+    final profilId = entry.value;
+
+    final profilDosyasi = File('$_profilDizini/$profilId.sensor_profile.json');
+    if (!profilDosyasi.existsSync()) {
+      stderr.writeln('Profil bulunamadı: ${profilDosyasi.path}');
+      exitCode = 1;
+      return;
+    }
+    final profil = jsonDecode(await profilDosyasi.readAsString()) as Map<String, dynamic>;
+
     final payload = buildLabelPayload(
-      productId: 'DART-$letter',
+      productId: 'KALIB-$harf',
       productType: 'levrek',
       productionDate: DateTime.now().toIso8601String().substring(0, 10),
-      sensorProfileId: 'GENIPIN_PUTRESIN_v2',
+      sensorProfileId: profilId,
       layoutVersion: 'QR_SENSOR_v4',
     );
     final result = await exportLabel(
       payload,
-      Directory('${outRoot.path}/$letter'),
+      Directory('${outRoot.path}/$harf'),
       density: 'low',
-      sensorProfile: entry.value,
+      sensorProfile: profil,
     );
-    stdout.writeln('$letter -> ${result.paths.length} dosya');
-    for (final p in result.paths.entries) {
-      stdout.writeln('   ${p.key.padRight(18)} ${p.value.path}');
-    }
+    final yontem = (profil['calibration_method'] as Map)['code'];
+    stdout.writeln('$harf  profil=$profilId  yöntem=$yontem  '
+        '-> ${result.paths.length} dosya');
   }
   stdout.writeln('\nYazıldı: ${outRoot.path}');
 }
