@@ -99,7 +99,7 @@ class _UserScreenState extends State<UserScreen> {
 
   /// GERÇEK (mock DEĞİL) bir sonucu geçmişe kaydeder — SADECE tamamlanmış
   /// okumalar (bkz. data/scan_history.dart dosya başlığı).
-  Future<void> _record(ColorEngineResult result, LabelInfo labelInfo) async {
+  Future<void> _record(ColorEngineResult result, LabelInfo labelInfo, {String? usedDecoder}) async {
     final file = _historyFile;
     if (file == null || result.rescanRecommended) return;
     try {
@@ -111,6 +111,13 @@ class _UserScreenState extends State<UserScreen> {
           when: DateTime.now(),
           freshnessClass: result.freshnessClass,
           technicalLevel: result.technicalLevel,
+          // Ölçüm detayları da kaydediliyor (4 Ekim): saha turunda her
+          // sonucu ekrandan elle not almak zorunda kalmamak için.
+          deltaE: result.deltaE,
+          confidence: result.confidence,
+          qualityScore: result.qualityScore,
+          calibrationMethod: labelInfo.calibrationMethod,
+          usedDecoder: usedDecoder,
         ),
       );
       if (mounted) setState(() => _history = updated);

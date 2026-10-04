@@ -173,7 +173,9 @@ class ScanView extends StatelessWidget {
     final label = cls != null ? (freshnessLabels[cls] ?? cls.toUpperCase()) : (entry.technicalLevel ?? 'Teknik sonuç');
     final color = cls != null ? (freshnessColors[cls] ?? scheme.primary) : scheme.onSurfaceVariant;
     final icon = cls != null ? (freshnessIcons[cls] ?? Icons.info_outline) : Icons.science_outlined;
-    return Padding(
+    return InkWell(
+      onTap: () => _showDetail(context, entry),
+      child: Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -222,6 +224,55 @@ class ScanView extends StatelessWidget {
             ),
           ),
         ],
+      ),
+      ),
+    );
+  }
+
+  /// Geçmiş kaydına dokununca ölçüm detaylarını gösterir (4 Ekim).
+  /// Eski kayıtlarda bu alanlar yok (null) — o zaman sadece mevcut bilgiler
+  /// görünür, "—" ile işaretlenir.
+  void _showDetail(BuildContext context, ScanHistoryEntry entry) {
+    String num3(double? v) => v == null ? '—' : v.toStringAsFixed(2);
+    final satirlar = <(String, String)>[
+      ('Ürün', entry.productType),
+      ('Parti', entry.productId),
+      ('Tarih', _formatWhen(entry.when)),
+      if (entry.freshnessClass != null) ('Tazelik', freshnessLabels[entry.freshnessClass] ?? entry.freshnessClass!),
+      ('Teknik sonuç', entry.technicalLevel ?? '—'),
+      ('ΔE', num3(entry.deltaE)),
+      ('Güven skoru', num3(entry.confidence)),
+      ('Okuma kalitesi', num3(entry.qualityScore)),
+      ('Kalibrasyon', entry.calibrationMethod ?? '—'),
+      ('Okuyucu', entry.usedDecoder ?? '—'),
+    ];
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Okuma detayı'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (ad, deger) in satirlar)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 120,
+                        child: Text(ad, style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                      ),
+                      Expanded(child: Text(deger, style: const TextStyle(fontWeight: FontWeight.w500))),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Kapat'))],
       ),
     );
   }

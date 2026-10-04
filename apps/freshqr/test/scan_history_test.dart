@@ -79,4 +79,40 @@ void main() {
       'freshness_class': 'fresh',
     });
   });
+
+  test('ölçüm detayları gidiş-dönüş', () {
+    final girdi = ScanHistoryEntry(
+      productType: 'Levrek',
+      productId: 'KALIB-C',
+      when: DateTime.parse('2026-10-04T12:30:00Z'),
+      technicalLevel: 'Renk seviyesi 4 / Profil noktası P4',
+      deltaE: 2.079,
+      confidence: 1.0,
+      qualityScore: 0.93,
+      calibrationMethod: 'multicolor_patch',
+      usedDecoder: 'ML Kit',
+    );
+    final geri = ScanHistoryEntry.tryFromJson(jsonDecode(jsonEncode(girdi.toJson())))!;
+    expect(geri.deltaE, closeTo(2.079, 1e-9));
+    expect(geri.confidence, 1.0);
+    expect(geri.qualityScore, closeTo(0.93, 1e-9));
+    expect(geri.calibrationMethod, 'multicolor_patch');
+    expect(geri.usedDecoder, 'ML Kit');
+  });
+
+  test('ESKİ kayıt (yeni alanlar yokken yazılmış) hâlâ okunabilir', () {
+    // Geriye dönük uyumluluk: cihazda zaten duran scan_history.json
+    // dosyaları bu alanları içermiyor, uygulama onları kaybetmemeli.
+    final eski = {
+      'product_type': 'Levrek',
+      'product_id': 'TR45678',
+      'when': '2026-09-30T10:00:00Z',
+      'technical_level': 'Renk seviyesi 2 / Profil noktası P2',
+    };
+    final geri = ScanHistoryEntry.tryFromJson(eski)!;
+    expect(geri.productId, 'TR45678');
+    expect(geri.technicalLevel, 'Renk seviyesi 2 / Profil noktası P2');
+    expect(geri.deltaE, isNull);
+    expect(geri.calibrationMethod, isNull);
+  });
 }

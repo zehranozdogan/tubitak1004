@@ -22,6 +22,15 @@ class ScanHistoryEntry {
   final DateTime when;
   final String? freshnessClass; // null olabilir (§7.2: eşik yoksa sınıf yok)
   final String? technicalLevel;
+  // ÖLÇÜM DETAYLARI (4 Ekim) — saha turunda her sonucu ekrandan elle not
+  // almak zorunda kalmamak için. Hepsi nullable: hem eski kayıt dosyaları
+  // (bu alanlar yokken yazılmış) okunabilsin, hem de mock/dosya yollarında
+  // bazıları doğal olarak bulunmayabilsin.
+  final double? deltaE;
+  final double? confidence;
+  final double? qualityScore;
+  final String? calibrationMethod;
+  final String? usedDecoder;
 
   const ScanHistoryEntry({
     required this.productType,
@@ -29,6 +38,11 @@ class ScanHistoryEntry {
     required this.when,
     this.freshnessClass,
     this.technicalLevel,
+    this.deltaE,
+    this.confidence,
+    this.qualityScore,
+    this.calibrationMethod,
+    this.usedDecoder,
   });
 
   Map<String, dynamic> toJson() => {
@@ -37,6 +51,11 @@ class ScanHistoryEntry {
         'when': when.toIso8601String(),
         if (freshnessClass != null) 'freshness_class': freshnessClass,
         if (technicalLevel != null) 'technical_level': technicalLevel,
+        if (deltaE != null) 'delta_e': deltaE,
+        if (confidence != null) 'confidence': confidence,
+        if (qualityScore != null) 'quality_score': qualityScore,
+        if (calibrationMethod != null) 'calibration_method': calibrationMethod,
+        if (usedDecoder != null) 'used_decoder': usedDecoder,
       };
 
   static ScanHistoryEntry? tryFromJson(dynamic json) {
@@ -53,6 +72,11 @@ class ScanHistoryEntry {
       when: when,
       freshnessClass: json['freshness_class'] as String?,
       technicalLevel: json['technical_level'] as String?,
+      deltaE: (json['delta_e'] as num?)?.toDouble(),
+      confidence: (json['confidence'] as num?)?.toDouble(),
+      qualityScore: (json['quality_score'] as num?)?.toDouble(),
+      calibrationMethod: json['calibration_method'] as String?,
+      usedDecoder: json['used_decoder'] as String?,
     );
   }
 }
