@@ -10,7 +10,7 @@ import numpy as np
 
 Image = np.ndarray
 
-DEFAULT_MIN_QUALITY = 0.5
+DEFAULT_MIN_QUALITY = 0.75
 
 # Laplacian varyansı bu değerin üstündeyse "keskin" (skor 1.0) kabul edilir;
 # altındaysa oransal olarak düşer. Değer deneysel — gerçek etiket

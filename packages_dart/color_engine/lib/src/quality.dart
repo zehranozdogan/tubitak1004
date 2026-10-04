@@ -16,7 +16,7 @@
 
 import 'homography.dart' show RgbImage;
 
-const double defaultMinQuality = 0.5;
+const double defaultMinQuality = 0.75;
 
 // Laplacian varyansı bu değerin üstündeyse "keskin" (skor 1.0) kabul
 // edilir — Python tarafındaki `_SHARPNESS_SATURATING_VARIANCE` ile aynı.

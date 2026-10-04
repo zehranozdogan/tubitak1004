@@ -95,7 +95,7 @@
   },
   "class_thresholds": null,
   "quality_gate": {
-    "min_quality_score": 0.5
+    "min_quality_score": 0.75
   },
   "output_fields": [
     "technical_level",
