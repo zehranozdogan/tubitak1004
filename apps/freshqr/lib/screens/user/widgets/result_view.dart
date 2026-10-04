@@ -41,6 +41,70 @@ class ResultView extends StatefulWidget {
 class _ResultViewState extends State<ResultView> {
   bool _showDetails = false;
 
+  /// Sonucun KULLANICI İÇİN ne anlama geldiğini anlatır — teknik
+  /// detaylardan ÖNCE (4 Ekim). Sahada "Renk seviyesi 2 / Profil noktası
+  /// P2" tek başına yorumlanamıyor.
+  ///
+  /// §7.2 SINIRI: tazelik sınıfı YOKSA burada sınıf UYDURULMAZ. Onun
+  /// yerine neden gösterilemediği ve teknik seviyenin ne demek olduğu
+  /// dürüstçe anlatılır. Profile `class_thresholds` + nokta `state`
+  /// etiketleri eklendiğinde (bkz. docs/saha-hazirlik-kontrol-listesi.md
+  /// A1 notu) bu kart KOD DEĞİŞMEDEN sınıf anlatımına geçer.
+  Widget _aciklamaKarti(BuildContext context, ColorEngineResult result) {
+    final scheme = Theme.of(context).colorScheme;
+    final cls = result.freshnessClass;
+
+    const anlamlar = <String, (String, String)>{
+      'fresh': (
+        'Ürün taze görünüyor.',
+        'Renk değişimi, profilin taze aralığında. Normal saklama koşullarında tüketilebilir.',
+      ),
+      'transition': (
+        'Ürün geçiş aşamasında.',
+        'Bozulma başlamış olabilir. Bekletmeden tüketilmesi ya da öncelikli sevk edilmesi önerilir.',
+      ),
+      'spoiled': (
+        'Ürün bozulmuş görünüyor.',
+        'Renk değişimi, profilin bozulma aralığında. Tüketilmesi önerilmez.',
+      ),
+    };
+
+    if (cls != null && anlamlar.containsKey(cls)) {
+      final (baslik, aciklama) = anlamlar[cls]!;
+      final renk = freshnessColors[cls] ?? scheme.primary;
+      return SectionCard(
+        title: 'Ne anlama geliyor?',
+        children: [
+          Text(baslik, style: TextStyle(fontWeight: FontWeight.w600, color: renk)),
+          const SizedBox(height: AppSpacing.xs),
+          Text(aciklama, style: TextStyle(color: scheme.onSurfaceVariant)),
+        ],
+      );
+    }
+
+    // Sınıf yok: dürüst açıklama (§7.2).
+    final nokta = result.matchedProfilePoint;
+    return SectionCard(
+      title: 'Ne anlama geliyor?',
+      children: [
+        Text(
+          'Bu ürün için "taze / geçiş / bozuk" sınıfı HENÜZ gösterilemiyor: '
+          'bu sensör profilinde bilimsel tazelik eşikleri tanımlı değil. '
+          'Yanlış yönlendirmemek için sınıf üretilmiyor (§7.2).',
+          style: TextStyle(color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Gösterilen "${result.technicalLevel ?? 'renk seviyesi'}" şu demek: ölçülen renk, '
+          'profildeki referans noktalarından bu numaralı olana en yakın çıktı. '
+          'Numara büyüdükçe renk koyulaşır${nokta != null ? ' (ölçülen derişim ≈ $nokta)' : ''} — '
+          'yani bozulma göstergesi artar.',
+          style: TextStyle(color: scheme.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final result = widget.result;
@@ -129,6 +193,7 @@ class _ResultViewState extends State<ResultView> {
             MetricBar(label: 'Okuma kalitesi', value: result.qualityScore),
           ],
         ),
+        _aciklamaKarti(context, result),
         Center(
           child: TextButton(
             onPressed: () => setState(() => _showDetails = !_showDetails),

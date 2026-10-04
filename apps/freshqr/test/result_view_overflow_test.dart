@@ -1,4 +1,12 @@
-// Uzun teknik seviye başlığı (eşiksiz profil) dar ekranda taşmamalı.
+// Uzun teknik seviye başlığı (eşiksiz profil) dar ekranda YATAY taşma
+// yapmamalı (RenderFlex unbounded width) — asıl korunan kural bu.
+//
+// Kaydırma: gerçek uygulamada ResultView, AppScreen'in ListView'ı içinde
+// yer alır (bkz. widgets/app_screen.dart), yani sayfa dikeyde kaydırılır.
+// Test burada kaydırmasız bir Scaffold kullanıyordu; içerik 800px'i
+// aşınca DİKEY taşma veriyordu — bu gerçek bir hata değil, test
+// kurulumunun gerçek kullanımdan farkıydı (4 Ekim'de "Ne anlama
+// geliyor?" kartı eklenince ortaya çıktı). Gerçek kullanıma uyduruldu.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,13 +21,17 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: ResultView(result: mockOk, labelInfo: mockLabelInfo, onRescan: () {}),
+          body: SingleChildScrollView(
+            child: ResultView(result: mockOk, labelInfo: mockLabelInfo, onRescan: () {}),
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.textContaining('Renk seviyesi'), findsOneWidget);
+    // Başlığa ÖZEL eşleşme: "Ne anlama geliyor?" kartı da teknik seviyeyi
+    // alıntılıyor, bu yüzden textContaining iki sonuç veriyor.
+    expect(find.text(mockOk.technicalLevel!), findsOneWidget);
   });
 }
