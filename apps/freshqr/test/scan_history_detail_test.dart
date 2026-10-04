@@ -26,7 +26,6 @@ void main() {
             child: ScanView(
               onScan: () {},
               testScenarios: const [],
-              onFileScan: (_, _) {},
               onUploadPhoto: () {},
               recentReads: [e],
             ),

@@ -47,11 +47,20 @@ class _ResultViewState extends State<ResultView> {
     final scheme = Theme.of(context).colorScheme;
 
     if (result.rescanRecommended) {
+      // GERÇEK SEBEBİ GÖSTER (4 Ekim): motor neden reddettiğini `notes`'a
+      // yazıyor (bulanıklık, desen uyuşmazlığı, parlama/doyma...). Burada
+      // sabit bir "görüntü bulanık olabilir" metni gösteriliyordu; okuma
+      // kalitesi 0.98 iken bile "Okuma kalitesi yetersiz" yazıyor, gerçek
+      // sebep gizli kalıyordu. Artık başlık ve açıklama sebebe göre.
+      final sebep = result.notes.isNotEmpty
+          ? result.notes.first
+          : 'Görüntü bulanık, parlamalı veya çok karanlık olabilir.';
+      final kaliteDusuk = result.qualityScore < 0.5;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SectionCard(
-            title: 'Okuma kalitesi yetersiz',
+            title: kaliteDusuk ? 'Okuma kalitesi yetersiz' : 'Sonuç üretilemedi',
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,8 +69,8 @@ class _ResultViewState extends State<ResultView> {
                   const SizedBox(width: AppSpacing.s),
                   Expanded(
                     child: Text(
-                      'Görüntü bulanık, parlamalı veya çok karanlık olabilir. '
-                      'Yanlış sonuç göstermemek için tazelik sınıfı üretilmedi (§7.2).',
+                      '$sebep\n\nYanlış sonuç göstermemek için tazelik sınıfı '
+                      'üretilmedi (§7.2).',
                       style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
                   ),

@@ -1,6 +1,10 @@
-// Kullanıcı ekranı: "Dosyadan test et" ile GERÇEK bir tarama tamamlanınca
-// "Son okumalar"a eklenir; "Test senaryoları" (mock) EKLENMEZ (bkz.
-// data/scan_history.dart dosya başlığı).
+// Kullanıcı ekranı: "Test senaryoları" (mock) geçmişe EKLENMEZ — bkz.
+// data/scan_history.dart dosya başlığı: mock bir ekran önizlemesidir,
+// gerçek ölçüm değildir, geçmişe yazmak "dürüst sonuç" ilkesiyle çelişir.
+//
+// GERÇEK bir taramanın geçmişe YAZILDIĞI ise artık etiket detay ekranında
+// test ediliyor (bkz. label_detail_test.dart) — "Dosyadan test et" kartı
+// 4 Ekim'de kullanıcı ekranından oraya taşındı.
 
 import 'dart:io';
 
@@ -52,7 +56,7 @@ void main() {
     } catch (_) {}
   });
 
-  testWidgets('gerçek dosya taraması -> Son okumalar\'a eklenir; mock test senaryosu eklenmez', (tester) async {
+  testWidgets('mock test senaryosu geçmişe EKLENMEZ', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 2200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -72,20 +76,5 @@ void main() {
     expect(find.textContaining('Henüz okuma yok'), findsOneWidget);
     expect(await tester.runAsync(() => loadScanHistory(historyFile)), isEmpty);
 
-    // Gerçek dosya taraması: Somon · TR90001, Bozuk.
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Bozuk'));
-    await _pumpReal(tester);
-    expect(find.text('BOZUK'), findsOneWidget);
-
-    await tester.tap(find.text('Yeniden Tara'));
-    await _pumpReal(tester);
-
-    expect(find.textContaining('Henüz okuma yok'), findsNothing);
-    expect(find.textContaining('Somon · TR90001'), findsOneWidget);
-
-    final saved = (await tester.runAsync(() => loadScanHistory(historyFile)))!;
-    expect(saved.length, 1);
-    expect(saved.single.freshnessClass, 'spoiled');
-    expect(saved.single.productId, 'TR90001');
   });
 }

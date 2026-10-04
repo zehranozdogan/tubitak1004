@@ -1,15 +1,28 @@
 // consumer/views/label_detail_view.py'nin Dart portu — tek bir etiketin
 // bilgileri + 3 tazelik durumunun renkli QR görselleri + silme.
+//
+// "Test et" düğmeleri (4 Ekim): bu etiketin sentetik durum görselini
+// GERÇEK analiz zincirinden geçirir — kamerasız. Daha önce bu yetenek
+// kullanıcı ekranındaki "Dosyadan test et" kartındaydı; kamera
+// çalışmaya başladıktan sonra oradan kaldırılıp buraya taşındı (kullanıcı
+// akışı sadeleşsin, yetenek kaybolmasın). Sonuç kullanıcı tarafındakiyle
+// AYNI ekranda (ResultView) gösterilir ve tamamlanmış okumalar aynı
+// şekilde geçmişe yazılır.
 
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import '../../data/label_store.dart';
+import '../../data/reference_data.dart';
+import '../../data/scan_history.dart';
+import '../../services/file_scan.dart';
+import '../../services/scan_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_screen.dart';
 import '../../widgets/kv_row.dart';
 import '../../widgets/section_card.dart';
+import '../user/widgets/result_view.dart';
 
 const Map<String, String> _stateLabels = {'fresh': 'Taze', 'transition': 'Geçiş', 'spoiled': 'Bozuk'};
 
@@ -17,7 +30,18 @@ class LabelDetailScreen extends StatefulWidget {
   final Directory dir;
   final String stem;
 
-  const LabelDetailScreen({super.key, required this.dir, required this.stem});
+  /// Test için enjekte edilebilir; null ise paketli varlıklar / uygulama
+  /// belge dizinindeki scan_history.json kullanılır.
+  final ReferenceData? reference;
+  final File? historyFile;
+
+  const LabelDetailScreen({
+    super.key,
+    required this.dir,
+    required this.stem,
+    this.reference,
+    this.historyFile,
+  });
 
   @override
   State<LabelDetailScreen> createState() => _LabelDetailScreenState();
@@ -26,6 +50,8 @@ class LabelDetailScreen extends StatefulWidget {
 class _LabelDetailScreenState extends State<LabelDetailScreen> {
   Map<String, dynamic>? _payload;
   Map<String, dynamic>? _layout;
+  late final ReferenceData _reference = widget.reference ?? ReferenceData();
+  bool _testing = false;
 
   @override
   void initState() {
@@ -66,6 +92,67 @@ class _LabelDetailScreenState extends State<LabelDetailScreen> {
     if (ok != true) return;
     await deleteLabel(widget.dir, widget.stem);
     if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Seçilen tazelik durumunun sentetik görselini GERÇEK zincirden
+  /// geçirir (kamerasız) ve sonucu kullanıcı tarafındakiyle AYNI ekranda
+  /// gösterir. Tamamlanmış okumalar geçmişe yazılır — yarım kalan
+  /// ("yeniden tara" ile biten) okumalar YAZILMAZ (§7.1).
+  Future<void> _testState(String stateKey) async {
+    if (_testing) return;
+    setState(() => _testing = true);
+    try {
+      final outcome = await scanStoredLabel(
+        dir: widget.dir,
+        stem: widget.stem,
+        state: stateKey,
+        reference: _reference,
+      );
+      if (!mounted) return;
+      switch (outcome) {
+        case ScanSuccess(:final result, :final labelInfo):
+          if (!result.rescanRecommended) {
+            try {
+              final file = widget.historyFile ?? await defaultScanHistoryFile();
+              await appendScanHistory(
+                file,
+                ScanHistoryEntry(
+                  productType: labelInfo.productType,
+                  productId: labelInfo.productId,
+                  when: DateTime.now(),
+                  freshnessClass: result.freshnessClass,
+                  technicalLevel: result.technicalLevel,
+                  deltaE: result.deltaE,
+                  confidence: result.confidence,
+                  qualityScore: result.qualityScore,
+                  calibrationMethod: labelInfo.calibrationMethod,
+                ),
+              );
+            } catch (_) {
+              // Geçmiş yazılamadı — sonucu göstermeye engel değil.
+            }
+          }
+          if (!mounted) return;
+          await Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (ctx) => AppScreen(
+              title: 'Tazelik sonucu',
+              onBack: () => Navigator.of(ctx).pop(),
+              children: [
+                ResultView(
+                  result: result,
+                  labelInfo: labelInfo,
+                  onRescan: () => Navigator.of(ctx).pop(),
+                ),
+              ],
+            ),
+          ));
+        case ScanInvalidQr(:final reason):
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(reason)));
+      }
+    } finally {
+      if (mounted) setState(() => _testing = false);
+    }
   }
 
   @override
@@ -116,7 +203,14 @@ class _LabelDetailScreenState extends State<LabelDetailScreen> {
               spacing: AppSpacing.m,
               runSpacing: AppSpacing.m,
               children: [
-                for (final entry in _stateLabels.entries) _StateImage(dir: widget.dir, stem: widget.stem, stateKey: entry.key, label: entry.value),
+                for (final entry in _stateLabels.entries)
+                  _StateImage(
+                    dir: widget.dir,
+                    stem: widget.stem,
+                    stateKey: entry.key,
+                    label: entry.value,
+                    onTest: _testing ? null : () => _testState(entry.key),
+                  ),
               ],
             ),
           ],
@@ -131,8 +225,15 @@ class _StateImage extends StatelessWidget {
   final String stem;
   final String stateKey;
   final String label;
+  final VoidCallback? onTest;
 
-  const _StateImage({required this.dir, required this.stem, required this.stateKey, required this.label});
+  const _StateImage({
+    required this.dir,
+    required this.stem,
+    required this.stateKey,
+    required this.label,
+    this.onTest,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -161,6 +262,7 @@ class _StateImage extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(label, style: TextStyle(fontSize: AppTextSizes.caption, color: scheme.onSurfaceVariant)),
+        OutlinedButton(onPressed: onTest, child: Text('$label test et')),
       ],
     );
   }

@@ -5,7 +5,6 @@
 
 import 'package:flutter/material.dart';
 
-import '../../../data/label_store.dart';
 import '../../../data/scan_history.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/section_card.dart';
@@ -13,10 +12,6 @@ import '../../../widgets/section_card.dart';
 class ScanView extends StatelessWidget {
   final VoidCallback onScan;
   final List<(String label, VoidCallback onTap)> testScenarios;
-
-  /// Bu cihazda üretilmiş etiketler (gerçek dosyadan okuma testi için).
-  final List<StoredLabel> storedLabels;
-  final void Function(StoredLabel label, String state) onFileScan;
 
   /// Bu cihazda YAPILMIŞ GERÇEK okumalar (yeniden eskiye) — bkz. dosya başlığı.
   final List<ScanHistoryEntry> recentReads;
@@ -31,8 +26,6 @@ class ScanView extends StatelessWidget {
     super.key,
     required this.onScan,
     required this.testScenarios,
-    this.storedLabels = const [],
-    required this.onFileScan,
     this.recentReads = const [],
     required this.onUploadPhoto,
     this.isAnalyzingPhoto = false,
@@ -97,49 +90,7 @@ class ScanView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.m),
-        _fileTestCard(context),
-        const SizedBox(height: AppSpacing.m),
         _recentReadsCard(context),
-      ],
-    );
-  }
-
-  Widget _fileTestCard(BuildContext context) {
-    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
-    if (storedLabels.isEmpty) {
-      return SectionCard(
-        title: 'Dosyadan test et (gerçek analiz)',
-        children: [
-          Text(
-            'Bu cihazda üretilmiş etiket yok. Önce Yönetici ekranından bir etiket oluşturun.',
-            style: TextStyle(fontSize: AppTextSizes.caption, color: muted),
-          ),
-        ],
-      );
-    }
-    return SectionCard(
-      title: 'Dosyadan test et (gerçek analiz)',
-      children: [
-        Text(
-          "Kamera yerine, ürettiğin bir etiketin sentetik durum görselini tüm okuyucu "
-          'zincirinden (payload doğrulama, paketli profil, homografi, kalibrasyon, ΔE) '
-          'geçirir — sonuç gerçek. (QR çözümü atlanır, metin etiket dosyasından alınır.)',
-          style: TextStyle(fontSize: AppTextSizes.caption, color: muted),
-        ),
-        for (final label in storedLabels.take(5)) ...[
-          const Divider(height: 1),
-          Text(
-            '${label.productType} · ${label.productId}',
-            style: const TextStyle(fontSize: AppTextSizes.body, fontWeight: FontWeight.w500),
-          ),
-          Wrap(
-            spacing: AppSpacing.xs,
-            children: [
-              for (final (key, text) in const [('fresh', 'Taze'), ('transition', 'Geçiş'), ('spoiled', 'Bozuk')])
-                OutlinedButton(onPressed: () => onFileScan(label, key), child: Text(text)),
-            ],
-          ),
-        ],
       ],
     );
   }

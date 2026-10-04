@@ -15,10 +15,8 @@ import 'package:color_engine/color_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../data/label_store.dart';
 import '../../data/reference_data.dart';
 import '../../data/scan_history.dart';
-import '../../services/file_scan.dart';
 import '../../services/scan_service.dart';
 import '../../services/static_image_scan.dart';
 import '../../widgets/app_screen.dart';
@@ -48,9 +46,7 @@ class _UserScreenState extends State<UserScreen> {
   _ViewState _view = _ViewState.scan;
   ColorEngineResult? _result;
   LabelInfo? _labelInfo;
-  List<StoredLabel> _storedLabels = const [];
   List<ScanHistoryEntry> _history = const [];
-  Directory? _dir;
   File? _historyFile;
   bool _isAnalyzingPhoto = false;
   String? _invalidQrReason;
@@ -63,23 +59,7 @@ class _UserScreenState extends State<UserScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStoredLabels();
     _loadHistory();
-  }
-
-  Future<void> _loadStoredLabels() async {
-    try {
-      final dir = widget.labelsDir ?? await defaultLabelsDir();
-      final labels = await loadLabels(dir);
-      if (mounted) {
-        setState(() {
-          _dir = dir;
-          _storedLabels = labels;
-        });
-      }
-    } catch (_) {
-      // Yerel depolama yok (ör. web): dosya testi kartı boş görünür.
-    }
   }
 
   Future<void> _loadHistory() async {
@@ -123,20 +103,6 @@ class _UserScreenState extends State<UserScreen> {
       if (mounted) setState(() => _history = updated);
     } catch (_) {
       // Geçmiş yazılamadı — sonucu göstermeye engel değil, sessizce geç.
-    }
-  }
-
-  Future<void> _fileScan(StoredLabel label, String state) async {
-    final dir = _dir;
-    if (dir == null) return;
-    final outcome = await scanStoredLabel(dir: dir, stem: label.stem, state: state, reference: _reference);
-    if (!mounted) return;
-    switch (outcome) {
-      case ScanSuccess(:final result, :final labelInfo):
-        await _record(result, labelInfo);
-        _runScan(result, labelInfo);
-      case ScanInvalidQr(:final reason):
-        _showInvalidQr(reason);
     }
   }
 
@@ -239,8 +205,6 @@ class _UserScreenState extends State<UserScreen> {
       _ViewState.scan => ScanView(
         onScan: _startScan,
         testScenarios: testScenarios,
-        storedLabels: _storedLabels,
-        onFileScan: _fileScan,
         recentReads: _history,
         onUploadPhoto: _uploadPhoto,
         isAnalyzingPhoto: _isAnalyzingPhoto,

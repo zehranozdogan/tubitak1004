@@ -14,6 +14,7 @@ import 'package:color_engine/color_engine.dart' show canonicalQrCorners;
 import 'package:image/image.dart' as img;
 import 'package:label_export/label_export.dart' as label_export;
 import 'package:profile_schema/profile_schema.dart' as schema;
+import 'package:qr_layout/qr_layout.dart' show edgePatchMargin;
 
 import '../data/label_store.dart';
 import '../data/reference_data.dart';
@@ -43,10 +44,26 @@ Future<ScanOutcome> scanStoredLabel({
     return ScanInvalidQr('label_payload geçersiz: $e');
   }
 
+  // KENAR YAMALI ETİKETLERDE BORDER FARKLI (4 Ekim'de bulundu):
+  // B (white_gray_black) ve C (multicolor_patch) etiketleri, yamalar QR'ın
+  // DIŞINA taştığı için `border + edgePatchMargin` (4+4=8) ile basılır
+  // (bkz. qr_layout/render.dart::renderWithEdge*). Burada köşeler sabit
+  // border=4 varsayılıyordu — yani QR, görüntüde olduğu yerden 4 modül
+  // ötede aranıyordu ve B/C etiketlerinin TÜM modülleri yanlış yerden
+  // okunuyordu. Sessizce yanlış sonuç veriyordu; analyzeFrame'e eklenen
+  // desen-eşleşme kontrolü bunu yakaladı.
+  //
+  // Hangi border'ın kullanıldığı layout'tan anlaşılıyor: beyaz/siyah
+  // dışında bir referans bölgesi varsa (gri/kırmızı/yeşil/mavi) etiket
+  // kenar yamasıyla basılmıştır.
+  final referenceRegions = (layoutJson['reference_regions'] as Map?) ?? const {};
+  final kenarYamasiVar = referenceRegions.keys.any((k) => k != 'white' && k != 'black');
+  final border = kenarYamasiVar ? 4 + edgePatchMargin : 4;
+
   return analyzeCapturedLabel(
     qrText: qrText,
     image: rgbImageFromImage(decoded),
-    corners: canonicalQrCorners(matrixSize),
+    corners: canonicalQrCorners(matrixSize, border: border),
     reference: reference,
   );
 }
