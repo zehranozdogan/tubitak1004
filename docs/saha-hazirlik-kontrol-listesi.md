@@ -19,6 +19,31 @@ Aşağıdaki liste üç gruba ayrıldı: **(A) sahaya çıkmayı engelleyenler**
 ## A. Sahaya çıkmayı ENGELLEYENLER
 
 ### A1. Tazelik eşikleri yok — uygulama sınıf üretemiyor
+
+> **⚠️ EŞİKLER GELİNCE KONTROL EDİLECEK (4 Ekim'de bulundu):**
+> `class_thresholds` alanını doldurmak TEK BAŞINA YETMEZ. Motor sınıfı,
+> ölçülen renge en yakın profil noktasının **kendi `state` etiketinden**
+> alıyor (`matching.dart::matchProfilePoint`); `class_thresholds` ise
+> yalnızca bir açma/kapama anahtarı gibi davranıyor (`hasClassThresholds`)
+> — içindeki `fresh_max` / `transition_max` sayıları ŞU AN HİÇ
+> KULLANILMIYOR.
+>
+> GENIPIN profillerinde altı noktanın da `state` değeri `null`. Yani
+> sadece `class_thresholds` yazılırsa **yine sınıf üretilmez**.
+>
+> Laboratuvardan gelmesi gereken asıl bilgi: altı derişim noktasından
+> (0.03125 / 0.0625 / 0.125 / 0.25 / 0.5 / 1.0 mM putresin) hangileri
+> taze, hangileri geçiş, hangileri bozuk sayılıyor.
+>
+> İki seçenek:
+> 1. **Etiketleme** — `class_thresholds`'u doldur ve altı noktaya `state`
+>    yaz. İki satırlık iş, mevcut kodla çalışır.
+> 2. **Gerçek eşik mantığı** — `fresh_max`/`transition_max` sayılarını
+>    kullanıp sınıfı derişimden hesapla. Daha doğru (ara değerlerde de
+>    çalışır) ama kod değişikliği + Python tarafıyla eşitleme gerektirir.
+>
+> Referans: DEMO_QR_STATE_COLORS_v1 bunun çalışan örneği — hem
+> `class_thresholds` dolu hem noktalar `fresh/transition/spoiled` etiketli.
 `GENIPIN_PUTRESIN_v2` profilinde `class_thresholds: null`. Bu yüzden
 `freshness_class` üretilmiyor; kullanıcı "Taze / Geçiş / Bozuk" yerine
 "Renk seviyesi 4 / Profil noktası P4" görüyor (rapor §7.2'nin bilinçli
