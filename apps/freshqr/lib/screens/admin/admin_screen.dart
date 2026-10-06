@@ -356,13 +356,9 @@ class _AdminScreenState extends State<AdminScreen> {
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(path), if (maske != null) XFile(maske)],
-        text: 'FreshQR etiketi — ${_productIdController.text}\n\n'
-            '1) "baski" dosyası = QR katmanı. Normal mürekkeple basılır; '
-            'reaktif hücreler BOŞ bırakılmıştır.\n'
-            '2) "reaktif_katman" dosyası = reaktif madde katmanı. '
-            'SİYAH kareler reaktif maddenin uygulanacağı yerlerdir; '
-            'beyaz alanlara HİÇBİR ŞEY uygulanmaz.\n\n'
-            'İki dosya aynı boyutta ve hizadadır, üst üste basılır.',
+        text: 'FreshQR etiketi — ${_productIdController.text}\n'
+            'baski: QR katmanı (reaktif hücreler boş)\n'
+            'reaktif_katman: reaktif maddenin uygulanacağı hücreler',
       ),
     );
   }
@@ -582,11 +578,11 @@ class _AdminScreenState extends State<AdminScreen> {
               if (_outputFiles.containsKey('pdf') || _outputFiles.containsKey('png')) ...[
                 const SizedBox(height: AppSpacing.m),
                 Text(
-                  'Baskı İKİ KATMAN hâlinde verilir, ikisi aynı boyutta ve hizadadır:\n'
-                  '• "baski" = QR katmanı; reaktif hücreler boş bırakılır.\n'
-                  '• "reaktif_katman" = SİYAH kareler reaktif maddenin uygulanacağı '
-                  'yerlerdir, beyaz alanlara bir şey uygulanmaz.\n'
-                  'Önizlemedeki gri hücreler yalnızca yerleşimi gösterir, basılmaz.',
+                  'Baskı İKİ KATMAN hâlinde verilir: "baski" dosyası QR katmanıdır '
+                  '(reaktif hücreler boş bırakılır), "reaktif_katman" dosyası ise '
+                  'reaktif maddenin uygulanacağı hücreleri gösterir. İkisi aynı '
+                  'boyutta ve hizadadır, üst üste basılır. Önizlemedeki gri hücreler '
+                  'yalnızca yerleşimi gösterir, basılmaz.',
                   style: TextStyle(
                     fontSize: AppTextSizes.caption,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
