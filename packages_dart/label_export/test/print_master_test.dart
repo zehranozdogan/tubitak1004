@@ -21,7 +21,7 @@ void main() {
     } catch (_) {}
   });
 
-  ({int row, int col}) _ilkReaktif(Map<String, dynamic> layout) {
+  ({int row, int col}) ilkReaktif(Map<String, dynamic> layout) {
     final ilk = (layout['sensor_modules'] as List).first as List;
     return (row: (ilk[0] as num).toInt(), col: (ilk[1] as num).toInt());
   }
@@ -42,7 +42,7 @@ void main() {
       );
       final sonuc = await exportLabel(payload, tmp, density: 'low', sensorProfile: profil);
 
-      final hucre = _ilkReaktif(sonuc.label.layoutJson);
+      final hucre = ilkReaktif(sonuc.label.layoutJson);
       final border = profil == null ? 4 : 4 + qr_layout.edgePatchMargin;
       const scale = 10;
       final x = (hucre.col + border) * scale + scale ~/ 2;
@@ -93,5 +93,75 @@ void main() {
           state: 'fresh', reactiveBlank: true),
       throwsArgumentError,
     );
+  });
+
+  // ---- REAKTİF KATMAN MASKESİ ----
+  // Baskı ustasındaki beyaz reaktif hücreler, QR'ın kendi beyazlarından
+  // gözle ayırt edilemez; maddeyi uygulayan kişi nereye uygulayacağını
+  // bilemez. Maske ikinci plakadır: aynı tuval, aynı hiza.
+
+  for (final (ad, profil) in [
+    ('yamasız (A)', null),
+    ('kenar yamalı (C)', {
+      'calibration_method': {'code': 'multicolor_patch'}
+    }),
+  ]) {
+    test('$ad: maske baskı ustasıyla AYNI boyutta ve hizada', () async {
+      final payload = buildLabelPayload(
+        productId: 'MASKE-1',
+        productType: 'levrek',
+        productionDate: '2026-10-06',
+        sensorProfileId: 'GENIPIN_PUTRESIN_v2',
+        layoutVersion: 'QR_SENSOR_v4',
+      );
+      final sonuc = await exportLabel(payload, tmp, density: 'low', sensorProfile: profil);
+
+      final baski = img.decodePng(await sonuc.paths['print_png']!.readAsBytes())!;
+      final maske = img.decodePng(await sonuc.paths['reactive_mask_png']!.readAsBytes())!;
+
+      expect(maske.width, baski.width, reason: 'hizalanamaz: tuval genişliği farklı');
+      expect(maske.height, baski.height, reason: 'hizalanamaz: tuval yüksekliği farklı');
+
+      // Maskenin SİYAH olduğu her yerde baskı ustası BEYAZ olmalı
+      // (reaktif madde oraya gelecek) ve tersi: maskenin işaretlediği
+      // hücreler gerçekten layout'taki reaktif hücreler olmalı.
+      final border = profil == null ? 4 : 4 + qr_layout.edgePatchMargin;
+      const scale = 10;
+      for (final cift in (sonuc.label.layoutJson['sensor_modules'] as List)) {
+        final row = ((cift as List)[0] as num).toInt();
+        final col = (cift[1] as num).toInt();
+        final x = (col + border) * scale + scale ~/ 2;
+        final y = (row + border) * scale + scale ~/ 2;
+
+        final m = maske.getPixel(x, y);
+        expect([m.r, m.g, m.b], [0, 0, 0], reason: 'maske bu hücreyi işaretlemiyor');
+
+        final b = baski.getPixel(x, y);
+        expect([b.r, b.g, b.b], [255, 255, 255], reason: 'baskı ustası bu hücreyi boş bırakmamış');
+      }
+    });
+  }
+
+  test('maske YALNIZCA reaktif hücreleri işaretler (QR modüllerini değil)', () async {
+    final payload = buildLabelPayload(
+      productId: 'MASKE-2',
+      productType: 'levrek',
+      productionDate: '2026-10-06',
+      sensorProfileId: 'GENIPIN_PUTRESIN_v2',
+      layoutVersion: 'QR_SENSOR_v4',
+    );
+    final sonuc = await exportLabel(payload, tmp, density: 'low');
+    final maske = img.decodePng(await sonuc.paths['reactive_mask_png']!.readAsBytes())!;
+
+    // Maskedeki siyah piksel sayısı, reaktif hücre sayısı x modül alanı
+    // kadar olmalı — fazlası QR'ın da basıldığı anlamına gelir.
+    var siyah = 0;
+    for (var y = 0; y < maske.height; y++) {
+      for (var x = 0; x < maske.width; x++) {
+        if (maske.getPixel(x, y).r == 0) siyah++;
+      }
+    }
+    final hucreSayisi = (sonuc.label.layoutJson['sensor_modules'] as List).length;
+    expect(siyah, hucreSayisi * 10 * 10, reason: 'maskede fazladan siyah var');
   });
 }
