@@ -124,18 +124,6 @@ Future<ExportedLabel> exportLabel(
     sensorProfile,
     state: null,
   );
-  // BASKI USTASI (6 Ekim): reaktif hücreler HİÇ BASILMAZ, beyaz kağıt
-  // kalır — gerçek üretimde oraya reaktif madde uygulanacak. Nötr gri
-  // (`png`/`pdf`) yalnızca YERLEŞİM ÖNİZLEMESİ: reaktif mürekkep grinin
-  // üstüne uygulanırsa renk kirlenir, çünkü profildeki referans renkler
-  // BEYAZ kağıt üzerinde tanımlı.
-  final printMasterImage = qr_layout.renderLabelImage(
-    generated.qr,
-    generated.layoutJson,
-    sensorProfile,
-    state: null,
-    reactiveBlank: true,
-  );
   final statePngs = qr_layout.syntheticStatesPngBytes(generated.qr, generated.layoutJson, sensorProfile);
 
   // Render sırasında reference_regions değişmiş olabilir (§6.1 B/C) —
@@ -148,8 +136,6 @@ Future<ExportedLabel> exportLabel(
     'layout_json': File('${outDir.path}/$stem.layout_version.json'),
     'png': File('${outDir.path}/$stem.png'),
     'pdf': File('${outDir.path}/$stem.pdf'),
-    'print_png': File('${outDir.path}/$stem.baski.png'),
-    'print_pdf': File('${outDir.path}/$stem.baski.pdf'),
     'state_fresh': File('${outDir.path}/$stem.state_fresh.png'),
     'state_transition': File('${outDir.path}/$stem.state_transition.png'),
     'state_spoiled': File('${outDir.path}/$stem.state_spoiled.png'),
@@ -160,8 +146,6 @@ Future<ExportedLabel> exportLabel(
   await paths['layout_json']!.writeAsString(encoder.convert(generated.layoutJson));
   await paths['png']!.writeAsBytes(img.encodePng(neutralImage));
   await paths['pdf']!.writeAsBytes(labelPdfBytes(neutralImage));
-  await paths['print_png']!.writeAsBytes(img.encodePng(printMasterImage));
-  await paths['print_pdf']!.writeAsBytes(labelPdfBytes(printMasterImage));
   await paths['state_fresh']!.writeAsBytes(statePngs['fresh']!);
   await paths['state_transition']!.writeAsBytes(statePngs['transition']!);
   await paths['state_spoiled']!.writeAsBytes(statePngs['spoiled']!);

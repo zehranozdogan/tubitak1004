@@ -35,15 +35,6 @@ Set<Cell> _cellSet(dynamic raw) {
 /// [state] rengiyle (null ise nötr gri), geri kalanını standart
 /// siyah/beyaz çizer.
 ///
-/// [reactiveBlank] true ise reaktif hücreler HİÇ BASILMAZ (beyaz kalır) —
-/// gerçek üretimde oraya reaktif madde uygulanacağı için (6 Ekim). Nötr
-/// gri yalnızca YERLEŞİM ÖNİZLEMESİdir: reaktif mürekkep grinin üstüne
-/// uygulanırsa renk kirlenir, çünkü profildeki referans renkler BEYAZ
-/// kağıt üzerinde tanımlı. [state] ile birlikte kullanılamaz (anlamsız).
-///
-/// QR hâlâ çözülür: reaktif hücreler ~%2 kadar (75/4225) ve ECC seviyesi
-/// H (%30 kurtarma) bunu fazlasıyla tolere eder.
-///
 /// `layout['intentional_errors']` (rapor §5.2/4) listesindeki modüller
 /// GERÇEK bitlerinin TERSİYLE render edilir — QR'ın hata düzeltmesi (ECC)
 /// bunu telafi etmesi beklenir (bkz. reactive.selectIntentionalErrors).
@@ -53,12 +44,7 @@ img.Image renderColoredImage(
   String? state,
   int scale = 10,
   int border = 4,
-  bool reactiveBlank = false,
 }) {
-  if (reactiveBlank && state != null) {
-    throw ArgumentError('reactiveBlank ile state birlikte verilemez: '
-        'baskı ustasında reaktif hücreler boş kalır, durum rengi basılmaz.');
-  }
   final matrix = moduleMatrix(qr);
   final n = matrix.length;
   final sensorSet = _cellSet(layout['sensor_modules']);
@@ -74,9 +60,7 @@ img.Image renderColoredImage(
       if (errorSet.contains((row: r, col: c))) {
         bit = 1 - bit; // kasıtlı hata: gerçek bitin tersini göster
       }
-      final reaktif = sensorSet.contains((row: r, col: c));
-      if (reactiveBlank && reaktif) continue; // basılmaz: beyaz kağıt kalır
-      final rgb = moduleColor(bit, reaktif, state);
+      final rgb = moduleColor(bit, sensorSet.contains((row: r, col: c)), state);
       final x0 = (c + border) * scale;
       final y0 = (r + border) * scale;
       img.fillRect(
@@ -108,11 +92,9 @@ img.Image renderColoredImage(
   String? state,
   int scale = 10,
   int border = 4,
-  bool reactiveBlank = false,
 }) {
   final totalBorder = border + edgePatchMargin;
-  final image = renderColoredImage(qr, layout,
-      state: state, scale: scale, border: totalBorder, reactiveBlank: reactiveBlank);
+  final image = renderColoredImage(qr, layout, state: state, scale: scale, border: totalBorder);
 
   final n = moduleMatrix(qr).length;
   final pos = edgeGrayPatchPosition(n, border: border);
@@ -144,12 +126,10 @@ img.Image renderColoredImage(
   int scale = 10,
   int border = 4,
   Map<String, Rgb3>? colors,
-  bool reactiveBlank = false,
 }) {
   final effectiveColors = colors ?? edgeReferenceColors;
   final totalBorder = border + edgePatchMargin;
-  final image = renderColoredImage(qr, layout,
-      state: state, scale: scale, border: totalBorder, reactiveBlank: reactiveBlank);
+  final image = renderColoredImage(qr, layout, state: state, scale: scale, border: totalBorder);
 
   final n = moduleMatrix(qr).length;
   final positions = edgePatchPositions(n, border: border, colors: effectiveColors);
@@ -227,14 +207,12 @@ img.Image renderLabelImage(
   String? state,
   int scale = 10,
   int border = 4,
-  bool reactiveBlank = false,
 }) {
   final code = ((sensorProfile?['calibration_method'] as Map<String, dynamic>?)?['code'] as String?) ??
       'white_black';
 
   if (code == _needsGrayPatch) {
-    final result = renderWithEdgeGrayPatch(qr, layout,
-        state: state, scale: scale, border: border, reactiveBlank: reactiveBlank);
+    final result = renderWithEdgeGrayPatch(qr, layout, state: state, scale: scale, border: border);
     final refs = (layout['reference_regions'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     layout['reference_regions'] = refs;
     refs['gray'] = [
@@ -244,8 +222,7 @@ img.Image renderLabelImage(
   }
 
   if (code == _needsMulticolorPatch) {
-    final result = renderWithEdgeReferencePatches(qr, layout,
-        state: state, scale: scale, border: border, reactiveBlank: reactiveBlank);
+    final result = renderWithEdgeReferencePatches(qr, layout, state: state, scale: scale, border: border);
     final refs = (layout['reference_regions'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     layout['reference_regions'] = refs;
     for (final entry in result.positions.entries) {
@@ -256,8 +233,7 @@ img.Image renderLabelImage(
     return result.image;
   }
 
-  return renderColoredImage(qr, layout,
-      state: state, scale: scale, border: border, reactiveBlank: reactiveBlank);
+  return renderColoredImage(qr, layout, state: state, scale: scale, border: border);
 }
 
 /// Rapor §8/§11: her renk durumunda (fresh/transition/spoiled) sentetik

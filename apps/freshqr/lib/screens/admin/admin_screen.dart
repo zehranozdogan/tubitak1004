@@ -341,12 +341,8 @@ class _AdminScreenState extends State<AdminScreen> {
   /// Rapor §8: "Basılabilir etiket PNG/PDF" — asıl fiziksel çıktı bu.
   /// Ham dosya yolu göstermek yerine (kullanıcı için anlamsız), yerel
   /// paylaşım/yazdırma sayfasını açar (AirDrop, e-posta, doğrudan yazıcı...).
-  /// BASKI USTASINI paylaşır (6 Ekim): reaktif hücrelerin BOŞ olduğu
-  /// dosya. Nötr gri önizleme basılırsa reaktif madde grinin üstüne gelir
-  /// ve renk kirlenir — profildeki referans renkler beyaz kağıt üzerinde
-  /// tanımlı. Eski etiketlerde baskı dosyası yoksa önizlemeye düşer.
   Future<void> _sharePdf() async {
-    final path = _outputFiles['print_pdf'] ?? _outputFiles['pdf'];
+    final path = _outputFiles['pdf'];
     if (path == null) return;
     await SharePlus.instance.share(
       ShareParams(files: [XFile(path)], text: 'FreshQR etiketi — ${_productIdController.text}'),
@@ -358,7 +354,7 @@ class _AdminScreenState extends State<AdminScreen> {
   /// üzerinden yapılabiliyor) bu, resim/video için ayrı bir sistem
   /// (MediaStore) kullanıyor, `gal` paketi bunu sarmalıyor.
   Future<void> _saveToGallery() async {
-    final path = _outputFiles['print_png'] ?? _outputFiles['png'];
+    final path = _outputFiles['png'];
     if (path == null) return;
     try {
       await Gal.putImage(path, album: 'FreshQR');
@@ -562,16 +558,6 @@ class _AdminScreenState extends State<AdminScreen> {
               ],
               if (_outputFiles.containsKey('pdf') || _outputFiles.containsKey('png')) ...[
                 const SizedBox(height: AppSpacing.m),
-                Text(
-                  'Baskı dosyasında reaktif hücreler BOŞ bırakılır — reaktif madde '
-                  'oraya uygulanacak. Yukarıdaki önizlemedeki gri hücreler yalnızca '
-                  'yerleşimi gösterir, basılmaz.',
-                  style: TextStyle(
-                    fontSize: AppTextSizes.caption,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.s),
                 Row(
                   children: [
                     if (_outputFiles.containsKey('pdf'))
