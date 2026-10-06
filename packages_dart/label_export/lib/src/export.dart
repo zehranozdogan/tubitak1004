@@ -136,15 +136,6 @@ Future<ExportedLabel> exportLabel(
     state: null,
     reactiveBlank: true,
   );
-  // REAKTİF KATMAN MASKESİ: baskı ustasında reaktif hücreler beyaz
-  // bırakıldığı için QR'ın kendi beyazlarından ayırt edilemez — maddeyi
-  // uygulayan kişi nereye uygulayacağını bilemez. Bu maske ikinci plaka:
-  // aynı tuval, aynı hiza, reaktif hücreler siyah.
-  final reactiveMask = qr_layout.reactiveMaskImage(
-    generated.qr,
-    generated.layoutJson,
-    sensorProfile,
-  );
   final statePngs = qr_layout.syntheticStatesPngBytes(generated.qr, generated.layoutJson, sensorProfile);
 
   // Render sırasında reference_regions değişmiş olabilir (§6.1 B/C) —
@@ -159,7 +150,6 @@ Future<ExportedLabel> exportLabel(
     'pdf': File('${outDir.path}/$stem.pdf'),
     'print_png': File('${outDir.path}/$stem.baski.png'),
     'print_pdf': File('${outDir.path}/$stem.baski.pdf'),
-    'reactive_mask_png': File('${outDir.path}/$stem.reaktif_katman.png'),
     'state_fresh': File('${outDir.path}/$stem.state_fresh.png'),
     'state_transition': File('${outDir.path}/$stem.state_transition.png'),
     'state_spoiled': File('${outDir.path}/$stem.state_spoiled.png'),
@@ -172,7 +162,6 @@ Future<ExportedLabel> exportLabel(
   await paths['pdf']!.writeAsBytes(labelPdfBytes(neutralImage));
   await paths['print_png']!.writeAsBytes(img.encodePng(printMasterImage));
   await paths['print_pdf']!.writeAsBytes(labelPdfBytes(printMasterImage));
-  await paths['reactive_mask_png']!.writeAsBytes(img.encodePng(reactiveMask));
   await paths['state_fresh']!.writeAsBytes(statePngs['fresh']!);
   await paths['state_transition']!.writeAsBytes(statePngs['transition']!);
   await paths['state_spoiled']!.writeAsBytes(statePngs['spoiled']!);

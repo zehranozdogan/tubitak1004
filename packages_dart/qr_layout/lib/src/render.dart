@@ -260,51 +260,6 @@ img.Image renderLabelImage(
       state: state, scale: scale, border: border, reactiveBlank: reactiveBlank);
 }
 
-/// REAKTİF KATMAN MASKESİ (6 Ekim) — reaktif maddenin NEREYE uygulanacağını
-/// gösteren ayrı plaka.
-///
-/// Baskı ustasında (`reactiveBlank: true`) reaktif hücreler beyaz bırakılır,
-/// ama o beyazlıklar QR'ın kendi beyaz modüllerinden GÖZLE AYIRT EDİLEMEZ —
-/// baskıyı yapan kişi maddeyi nereye uygulayacağını bilemez. Çözüm, çok
-/// renkli baskının standart yöntemi: her mürekkep kendi katmanında.
-///
-/// Bu maske, baskı ustasıyla BİREBİR AYNI tuval boyutunda ve hizadadır
-/// (aynı `scale`, aynı border) — üst üste bindirildiğinde reaktif hücreler
-/// tam oturur. Reaktif hücreler SİYAH (mürekkep buraya), geri kalan beyaz.
-img.Image reactiveMaskImage(
-  GeneratedQr qr,
-  Map<String, dynamic> layout,
-  Map<String, dynamic>? sensorProfile, {
-  int scale = 10,
-  int border = 4,
-}) {
-  final code = ((sensorProfile?['calibration_method'] as Map<String, dynamic>?)?['code'] as String?) ??
-      'white_black';
-  // Kenar yamalı yöntemlerde tuval daha büyük — baskı ustasıyla aynı
-  // border kullanılmalı, yoksa iki katman hizalanmaz.
-  final totalBorder =
-      (code == _needsGrayPatch || code == _needsMulticolorPatch) ? border + edgePatchMargin : border;
-
-  final n = moduleMatrix(qr).length;
-  final size = (n + 2 * totalBorder) * scale;
-  final image = img.Image(width: size, height: size, numChannels: 3);
-  img.fill(image, color: img.ColorRgb8(255, 255, 255));
-
-  for (final (:row, :col) in _cellSet(layout['sensor_modules'])) {
-    final x0 = (col + totalBorder) * scale;
-    final y0 = (row + totalBorder) * scale;
-    img.fillRect(
-      image,
-      x1: x0,
-      y1: y0,
-      x2: x0 + scale - 1,
-      y2: y0 + scale - 1,
-      color: img.ColorRgb8(0, 0, 0),
-    );
-  }
-  return image;
-}
-
 /// Rapor §8/§11: her renk durumunda (fresh/transition/spoiled) sentetik
 /// etiketin PNG baytlarını üretir — `sensorProfile`'ın kalibrasyon
 /// yönteminin (§6.1 B/C) ihtiyacı olan referans yamalarını da basar ve

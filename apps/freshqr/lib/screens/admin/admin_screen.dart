@@ -348,18 +348,8 @@ class _AdminScreenState extends State<AdminScreen> {
   Future<void> _sharePdf() async {
     final path = _outputFiles['print_pdf'] ?? _outputFiles['pdf'];
     if (path == null) return;
-    // Baskıcıya İKİ dosya birden gider: baskı ustası (QR, reaktif hücreler
-    // boş) ve reaktif katman maskesi (maddenin NEREYE uygulanacağı). Tek
-    // başına baskı ustası yetmez — boş hücreler QR'ın kendi beyazlarından
-    // ayırt edilemez (6 Ekim).
-    final maske = _outputFiles['reactive_mask_png'];
     await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(path), if (maske != null) XFile(maske)],
-        text: 'FreshQR etiketi — ${_productIdController.text}\n'
-            'baski: QR katmanı (reaktif hücreler boş)\n'
-            'reaktif_katman: reaktif maddenin uygulanacağı hücreler',
-      ),
+      ShareParams(files: [XFile(path)], text: 'FreshQR etiketi — ${_productIdController.text}'),
     );
   }
 
@@ -372,14 +362,9 @@ class _AdminScreenState extends State<AdminScreen> {
     if (path == null) return;
     try {
       await Gal.putImage(path, album: 'FreshQR');
-      // Reaktif katman maskesi de kaydedilir — ikisi birlikte anlamlı.
-      final maske = _outputFiles['reactive_mask_png'];
-      if (maske != null) await Gal.putImage(maske, album: 'FreshQR');
       if (mounted) {
         setState(() {
-          _statusText = maske != null
-              ? 'İki katman da galeriye kaydedildi (QR + reaktif katman).'
-              : 'Görsel galeriye kaydedildi.';
+          _statusText = 'Görsel galeriye kaydedildi.';
           _statusIsError = false;
         });
       }
@@ -578,11 +563,9 @@ class _AdminScreenState extends State<AdminScreen> {
               if (_outputFiles.containsKey('pdf') || _outputFiles.containsKey('png')) ...[
                 const SizedBox(height: AppSpacing.m),
                 Text(
-                  'Baskı İKİ KATMAN hâlinde verilir: "baski" dosyası QR katmanıdır '
-                  '(reaktif hücreler boş bırakılır), "reaktif_katman" dosyası ise '
-                  'reaktif maddenin uygulanacağı hücreleri gösterir. İkisi aynı '
-                  'boyutta ve hizadadır, üst üste basılır. Önizlemedeki gri hücreler '
-                  'yalnızca yerleşimi gösterir, basılmaz.',
+                  'Baskı dosyasında reaktif hücreler BOŞ bırakılır — reaktif madde '
+                  'oraya uygulanacak. Yukarıdaki önizlemedeki gri hücreler yalnızca '
+                  'yerleşimi gösterir, basılmaz.',
                   style: TextStyle(
                     fontSize: AppTextSizes.caption,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
