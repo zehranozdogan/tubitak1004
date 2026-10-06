@@ -68,6 +68,40 @@ basılıyor. Gerçek pigment reaksiyonu kimya tarafının kapsamında ve henüz
 doğrulanmadı. Sahada okunacak şey gerçek reaksiyon olacağı için, mevcut
 tüm doğrulamalar "simülasyon üzerinde" geçerli.
 
+> **⏸️ DANIŞMANA SORULACAK (6 Ekim) — reaktif maddenin baskıya nasıl
+> uygulanacağı**
+>
+> Şu anki "basılacak dosya" reaktif hücreleri **nötr gri** çiziyor. Ama
+> gerçek üretimde oraya reaktif madde uygulanacak; mürekkep grinin üstüne
+> gelirse renk kirlenir, çünkü profildeki referans renkler BEYAZ kağıt
+> üzerinde tanımlı.
+>
+> Bu amaçla iki katmanlı bir çıktı geliştirildi (baskı ustası: reaktif
+> hücreler boş + reaktif katman maskesi: maddenin uygulanacağı hücreler),
+> sonra **bilinçli olarak geri alındı** — karar danışmanla verilecek.
+> Geri getirmek için: `git revert` ile `15d624c`, `7ffe08d`, `041977f`
+> commit'lerinin revert'leri tersine çevrilir (kod ve testler hazır).
+>
+> **Geri almanın sebebi, çözülmemiş iki soru:**
+>
+> 1. **Hizalama.** 5cm etikette 73 modül var → modül başına **~0.68 mm**;
+>    reaktif maddenin hücre içinde kalması için kayma **~0.3 mm'yi**
+>    geçmemeli. Tek baskı makinesinde çok mürekkepli geçişte kayma
+>    0.05–0.1 mm (sorun yok); kağıdı çıkarıp tekrar beslemede ya da elle
+>    hizalamada 0.5–2 mm (olmaz). Yani iki ayrı işlem olarak YAPILAMAZ.
+> 2. **Üretim gerçekliği.** Etiketleri kimin, hangi makineyle basacağı
+>    belirlenmeden doğru çıktı biçimi seçilemez.
+>
+> **Danışmana sorulacak asıl soru:** reaktif madde, QR ile **aynı baskı
+> geçişinde** (ayrı mürekkep kanalı olarak) uygulanabiliyor mu?
+>
+> - **Evet** ise: iki katmanlı çıktı geri getirilir, mevcut tasarım korunur.
+> - **Hayır** ise: reaktif hücreleri QR'ın içine serpiştirmek yerine,
+>   QR'ın yanında **tek parça reaktif alan** kullanmak gündeme gelir.
+>   Hizalama toleransı milimetreye çıkar ve QR saf siyah-beyaz kalır — ama
+>   bu, raporun §5.2'sindeki "QR'ın kendisinin sensör olması" fikrini
+>   değiştirir, yani tasarım düzeyinde bir karardır.
+
 ---
 
 ## B. Saha ÖNCESİ yapılması gerekenler
