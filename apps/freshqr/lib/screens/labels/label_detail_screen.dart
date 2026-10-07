@@ -12,6 +12,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 
 import '../../data/label_store.dart';
 import '../../data/reference_data.dart';
@@ -155,6 +156,32 @@ class _LabelDetailScreenState extends State<LabelDetailScreen> {
     }
   }
 
+  /// Üç tazelik durumunun sentetik görselini telefonun galerisine
+  /// kaydeder (7 Ekim). Bunlar TEST hedefleridir — basılacak dosya değil.
+  /// Nötr önizlemeyi (gri reaktif hücreler) taramak anlamsız sonuç verir:
+  /// gri, profildeki hiçbir renge karşılık gelmez, yalnızca parlaklık
+  /// olarak tesadüfen bir noktaya düşer.
+  Future<void> _saveStatesToGallery() async {
+    var kaydedilen = 0;
+    String? hata;
+    for (final key in _stateLabels.keys) {
+      final png = File('${widget.dir.path}/${widget.stem}.state_$key.png');
+      if (!png.existsSync()) continue;
+      try {
+        await Gal.putImage(png.path, album: 'FreshQR');
+        kaydedilen++;
+      } catch (ex) {
+        hata = '$ex';
+      }
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(hata != null
+          ? 'Kaydedilemedi: $hata'
+          : '$kaydedilen durum görseli galeriye kaydedildi (FreshQR albümü).'),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final payload = _payload;
@@ -198,6 +225,22 @@ class _LabelDetailScreenState extends State<LabelDetailScreen> {
         SectionCard(
           title: 'Tazelik durumları (§8: sentetik görseller)',
           children: [
+            Text(
+              'Bu görseller TEST hedefidir. Basılacak dosya bunlar değil, '
+              'nötr etikettir — ama nötr etiketi taramak anlamsız sonuç verir '
+              '(reaktif hücreler gri, bir tazelik durumu taşımaz).',
+              style: TextStyle(
+                fontSize: AppTextSizes.caption,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.image_outlined, size: 18),
+              label: const Text('Durum görsellerini galeriye kaydet'),
+              onPressed: _saveStatesToGallery,
+            ),
+            const SizedBox(height: AppSpacing.s),
             Wrap(
               alignment: WrapAlignment.center,
               spacing: AppSpacing.m,
