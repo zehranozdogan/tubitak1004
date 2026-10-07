@@ -6,6 +6,7 @@
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freshqr/data/reference_data.dart';
@@ -61,6 +62,11 @@ void main() {
   testWidgets('"Bozuk test et" gerçek sonuç üretir ve geçmişe yazar', (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 2200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    // "test et" artık GERÇEK kod çözme yolunu kullanıyor (7 Ekim); bu
+    // ortamda ML Kit'in arkası yok, Windows'a sabitleyip zxing2 yolunu
+    // zorunlu kılıyoruz. `testWidgets` gövde biterken debug değişkenlerin
+    // sıfırlanmış olmasını şart koştuğu için setUp/tearDown değil, BURADA.
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
 
     await tester.pumpWidget(MaterialApp(
       home: LabelDetailScreen(
@@ -90,5 +96,7 @@ void main() {
     // Ölçüm detayları da kaydedilmeli (4 Ekim).
     expect(kayitlar.single.deltaE, isNotNull);
     expect(kayitlar.single.calibrationMethod, isNotNull);
+
+    debugDefaultTargetPlatformOverride = null;
   });
 }

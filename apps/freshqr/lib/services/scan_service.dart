@@ -132,6 +132,9 @@ Future<ScanOutcome> analyzeCapturedLabel({
       productId: payload.productId,
       productionDate: _displayDate(payload.productionDate),
       calibrationMethod: loaded.profile.calibrationMethod.code,
+      // Hangi decoder çözdü: ML Kit gerçek köşeleri verir, zxing2 yalnızca
+      // finder noktalarını (bkz. bu dosyanın corners/finderPoints notu).
+      usedDecoder: corners != null ? 'ML Kit' : 'zxing2 (yedek)',
     ),
   );
 }

@@ -206,7 +206,8 @@ class _ResultViewState extends State<ResultView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (widget.usedDecoder != null) KvRow('Okuyucu', widget.usedDecoder!),
+                if ((widget.usedDecoder ?? widget.labelInfo.usedDecoder) != null)
+                  KvRow('Okuyucu', widget.usedDecoder ?? widget.labelInfo.usedDecoder!),
                 if (widget.labelInfo.calibrationMethod != null)
                   KvRow('Kalibrasyon', widget.labelInfo.calibrationMethod!),
                 // GEÇİCİ (teşhis amaçlı, 1 Ekim): ML Kit çökme metni uzun ve

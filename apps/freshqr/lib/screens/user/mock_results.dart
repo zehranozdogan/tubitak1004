@@ -16,12 +16,17 @@ class LabelInfo {
   // ekranındaki teknik detaylarda gösteriliyor: A/B/C karşılaştırmasında
   // doğru yöntemin uygulandığı cihazda gözle doğrulanabilsin diye.
   final String? calibrationMethod;
+  /// QR'ı hangi decoder'ın çözdüğü. Kamera yolunda ayrıca (daha ayrıntılı,
+  /// ML Kit hata metniyle birlikte) ResultView'e doğrudan geçiliyor; bu
+  /// alan dosya/fotoğraf yollarını da kapsıyor (7 Ekim).
+  final String? usedDecoder;
 
   const LabelInfo({
     required this.productType,
     required this.productId,
     required this.productionDate,
     this.calibrationMethod,
+    this.usedDecoder,
   });
 }
 

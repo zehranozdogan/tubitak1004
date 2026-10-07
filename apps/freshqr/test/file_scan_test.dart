@@ -3,6 +3,8 @@
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugDefaultTargetPlatformOverride;
+import 'package:flutter/material.dart' show TargetPlatform;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freshqr/data/reference_data.dart';
 import 'package:freshqr/services/file_scan.dart';
@@ -10,14 +12,21 @@ import 'package:freshqr/services/scan_service.dart';
 import 'package:label_export/label_export.dart' as label_export;
 
 void main() {
+  // scanStoredLabel artık GERÇEK kod çözme yolunu kullanıyor (7 Ekim) ve o
+  // yol ML Kit'in platform kanalına dokunuyor — testte binding başlatılmalı.
+  // Platform Windows'a sabitleniyor ki ML Kit (bu ortamda arkası yok)
+  // denenmesin, zxing2 yolu çalışsın (static_image_scan_test ile aynı desen).
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Directory dir;
   final reference = ReferenceData((p) => File(p).readAsString());
 
   setUp(() async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     dir = await Directory.systemTemp.createTemp('freshqr_filescan_');
   });
 
   tearDown(() async {
+    debugDefaultTargetPlatformOverride = null;
     try {
       await dir.delete(recursive: true);
     } catch (_) {}
