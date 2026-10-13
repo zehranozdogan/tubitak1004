@@ -58,9 +58,24 @@ uygulamayla mümkün değil.
 | kısaltılmış (62 kr) | 45×45 | 2,83 mm | 3,96 mm | 5,66 mm |
 | çok kısa (28 kr) | 33×33 | **3,66 mm** | 5,12 mm | 7,32 mm |
 
+**ÖNEMLİ BULGU (13 Ekim, ölçüldü):** payload'ı kısaltmak ŞART DEĞİL.
+Asıl değişmesi gereken şey, reaktif hücrelerin **tek tek dağıtılmak
+yerine bitişik bloklara gruplanması**. Mevcut 65×65 QR'da bile 5 cm
+etikette 5×5 blok = 3,4 mm oluyor ve QR hâlâ okunuyor (doğrulandı).
+Payload kısaltma blok başına daha az modül harcar ama şema değişikliği
+gerektirir — gerekmiyorsa yapılmamalı.
+
+**Üretilen seçenekler:** `tests/device/build_qr_options.py` 27 kombinasyon
+(payload uzunluğu × etiket boyutu × damla çapı) üretiyor ve her birinde
+QR'ın HÂLÂ ÇÖZÜLDÜĞÜNÜ doğruluyor (bir kombinasyon elendi: 33×33 / 5 cm /
+4 mm damla → reaktif alan %13,2 olunca QR okunmuyor).
+
+Kimyaya gösterilmek üzere **gerçek boyutta basılabilir** dosya:
+`tests/device/QR_Tasarim_Secenekleri.docx` — cetvelle ölçülüp "damla bu
+bloğa sığar mı" sorusu doğrudan cevaplanabilir.
+
 **Karar için gereken tek bilgi:** kimya tarafının damlattığı hacim ve
-oluşan lekenin çapı (mm). O sayı gelince yukarıdaki tablodan QR sürümü +
-etiket boyutu + blok ölçüsü doğrudan seçilebilir.
+oluşan lekenin çapı (mm). O sayı gelince seçenek doğrudan belirlenir.
 
 ### ⚠️ LOD, profil ölçeğinin yarısını geçersiz kılıyor
 
@@ -81,9 +96,11 @@ LOD'un üstünden başlayacak şekilde yeniden tanımlanmalı.
 
 ### Diğer işler
 
-- **§7 — "Tüketilebilir" ifadesi onaylanmadı.** Sonuç ekranındaki tüketim
-  tavsiyeleri kaldırıldı (13 Ekim); metinler artık yalnızca ölçümün ne
-  gösterdiğini söylüyor, ne yapılacağını değil. Onay gelirse geri eklenir.
+- **§7 — "Tüketilebilir" ifadesine açık onay YOK (ama ret de yok).**
+  Metinler şimdilik olduğu gibi bırakıldı (kullanıcı kararı, 13 Ekim).
+  **Sahaya çıkmadan önce yazılı onay alınmalı:** gıda güvenliği tavsiyesi,
+  bilimsel eşikler kesinleşmeden ve onay alınmadan kullanıcıya
+  gösterilmemeli.
 - **§6 — çekim koşulları** için danışman da literatür tarayacak. Önerdiği
   ölçütler (QR'ın kadrajdaki alanı, netlik, parlama, perspektif) bizim
   kalite kapımızla örtüşüyor; sabit santimetre yerine bunlar kullanılabilir.

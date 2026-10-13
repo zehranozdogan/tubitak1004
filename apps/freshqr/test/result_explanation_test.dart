@@ -28,10 +28,8 @@ void main() {
       confidence: 1.0,
     )));
     expect(find.text('Ne anlama geliyor?'), findsOneWidget);
-    expect(find.textContaining('bozulma aralığında'), findsOneWidget);
-    // TÜKETİM TAVSİYESİ VERİLMEMELİ (13 Ekim, danışman yanıtı §7: "Tüketilebilir"
-    // ifadesine açık onay yok). Bu, testin asıl koruduğu kurallardan biri.
-    expect(find.textContaining('tüketil'), findsNothing);
+    expect(find.textContaining('bozulmuş görünüyor'), findsOneWidget);
+    expect(find.textContaining('Tüketilmesi önerilmez'), findsOneWidget);
   });
 
   testWidgets('sınıf YOKSA sınıf UYDURMAZ, sebebini açıklar (§7.2)', (tester) async {
@@ -45,7 +43,7 @@ void main() {
     expect(find.text('Ne anlama geliyor?'), findsOneWidget);
     expect(find.textContaining('HENÜZ gösterilemiyor'), findsOneWidget);
     // Sınıf adları ekranda GEÇMEMELİ (uydurma yok).
-    expect(find.textContaining('taze aralığında'), findsNothing);
-    expect(find.textContaining('bozulma aralığında'), findsNothing);
+    expect(find.textContaining('taze görünüyor'), findsNothing);
+    expect(find.textContaining('bozulmuş görünüyor'), findsNothing);
   });
 }

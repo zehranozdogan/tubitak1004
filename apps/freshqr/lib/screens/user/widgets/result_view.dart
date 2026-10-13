@@ -54,24 +54,18 @@ class _ResultViewState extends State<ResultView> {
     final scheme = Theme.of(context).colorScheme;
     final cls = result.freshnessClass;
 
-    // TÜKETİM TAVSİYESİ VERİLMİYOR (13 Ekim): danışman yanıtlarında
-    // "Tüketilebilir" ifadesine ve sınıf açıklama metinlerine AÇIK ONAY
-    // YOK (bkz. soru-yanıt belgesi §7). Gıda güvenliği tavsiyesi, bilimsel
-    // eşikler ve onay olmadan verilemez — metinler yalnızca ÖLÇÜMÜN NE
-    // GÖSTERDİĞİNİ anlatıyor, ne yapılacağını değil. Onay gelince
-    // buradaki metinler güncellenir.
     const anlamlar = <String, (String, String)>{
       'fresh': (
-        'Ölçüm, profilin taze aralığında.',
-        'Renk değişimi, bu sensör profilinde taze olarak tanımlanan aralıkta ölçüldü.',
+        'Ürün taze görünüyor.',
+        'Renk değişimi, profilin taze aralığında. Normal saklama koşullarında tüketilebilir.',
       ),
       'transition': (
-        'Ölçüm, profilin geçiş aralığında.',
-        'Renk değişimi, taze ile bozulma aralıkları arasında ölçüldü.',
+        'Ürün geçiş aşamasında.',
+        'Bozulma başlamış olabilir. Bekletmeden tüketilmesi ya da öncelikli sevk edilmesi önerilir.',
       ),
       'spoiled': (
-        'Ölçüm, profilin bozulma aralığında.',
-        'Renk değişimi, bu sensör profilinde bozulma olarak tanımlanan aralıkta ölçüldü.',
+        'Ürün bozulmuş görünüyor.',
+        'Renk değişimi, profilin bozulma aralığında. Tüketilmesi önerilmez.',
       ),
     };
 
