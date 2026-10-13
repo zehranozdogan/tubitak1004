@@ -136,9 +136,27 @@ derişimdeyse o rengi verir, okuyucu en yakın noktayı bulur.
    duruyor — ama ölçülen hücrelerin artık QR biti olmadığı için
    A/B/C'nin göreli avantajları değişebilir.
 
-**DOĞRULANDI:** düz tek renkli bloklarla QR hâlâ okunuyor — 3×3'ten
-8×8'e (%1,9–%13,6 reaktif alan) taze/geçiş/bozuk üç renkte de başarılı.
-Yani kod çözme tarafında engel yok.
+**DOĞRULANDI (iki decoder'la da):**
+
+- **zxing2/pyzbar** (masaüstü): düz tek renkli bloklarla 3×3'ten 8×8'e
+  (%1,9–%13,6 reaktif alan), taze/geçiş/bozuk üç renkte de çözülüyor.
+- **ML Kit** (emülatör, 13 Ekim): seçenek görselleri galeriden "Cihazdan
+  Fotoğraf Yükle" ile okutuldu, sonuç ekranındaki "Okuyucu" satırı
+  **ML Kit** gösterdi — yani birincil decoder yedeğe düşmeden çözüyor.
+
+Kod çözme tarafında engel yok; tasarım kararı bu açıdan risksiz.
+
+**Ama mevcut uygulama bu etiketleri ÖLÇEMEZ** (13 Ekim testi): QR'ı çözer,
+sonra hücre konumlarını payload'dan türetip ESKİ dağıtılmış 75 modülü
+arar; bloklar başka yerde olduğu için sıradan QR modüllerini ölçer ve
+kendinden emin bir P6 verir. İndikatör hiç uygulanmamış baskı ustası bile
+P6 dedi.
+
+Bu beklenen davranış, hata değil — ama **yeni tasarım yeni bir
+`layout_version` ile gelmeli** (ör. `QR_SENSOR_v5`). Doğrulandı: tanınmayan
+bir `layout_version` taşıyan etiket reddediliyor (`ScanInvalidQr`), yani
+güncellenmemiş bir telefon yeni etiketi sessizce yanlış okumaz, dürüstçe
+"tanımıyorum" der. Sürüm adı değişmezse bu koruma devreye girmez.
 
 ### ⚠️ LOD, profil ölçeğinin yarısını geçersiz kılıyor
 
