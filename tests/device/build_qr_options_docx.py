@@ -38,29 +38,44 @@ def main() -> None:
 
     a = doc.add_paragraph().add_run(
         "Bu sayfadaki QR'lar GERÇEK BOYUTTA basılmıştır (yazdırırken "
-        "'sayfaya sığdır'/ölçekleme KAPALI olmalı). Renkli kareler, "
-        "indikatörün damlatılacağı reaktif alanlardır. Her görselin altında "
-        "o alanın kenar uzunluğu yazıyor — cetvelle ölçüp damlanın sığıp "
-        "sığmadığına bakılabilir.")
+        "'sayfaya sığdır'/ölçekleme KAPALI olmalı). "
+        "SOLDAKİ görsel basılacak olandır: reaktif alanlar BOŞ bırakılır "
+        "(beyaz kâğıt), yalnızca bir modüllük çerçeveleri basılır — çerçeve, "
+        "operatörün nereye damlatacağını görmesi içindir. İndikatör beyaz "
+        "kâğıdın üzerine damlatılmalı; altına renk basılırsa ölçüm bozulur. "
+        "SAĞDAKİ görsel yalnızca indikatör uygulandıktan sonra nasıl "
+        "görüneceğini gösterir, basılmaz. Çerçevelerin içini cetvelle ölçüp "
+        "damlanın sığıp sığmadığına bakılabilir.")
     a.font.size = Pt(9)
 
     for damla, etiket, matris in SECENEKLER:
         ad = f"{matris}_{etiket:.0f}cm_damla{damla:.0f}mm"
-        png = KAYNAK / f"{ad}_ornek.png"
-        if not png.exists():
+        baski = KAYNAK / f"{ad}_baski.png"
+        ornek = KAYNAK / f"{ad}_ornek.png"
+        if not baski.exists():
             continue
         doc.add_paragraph()
         bas = doc.add_paragraph().add_run(
             f"Etiket {etiket:.0f} cm · reaktif alan ≈ {damla:.0f} mm hedefli")
         bas.bold = True
         bas.font.size = Pt(11)
-        p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p.add_run().add_picture(str(png), width=Cm(etiket), height=Cm(etiket))
+        tablo = doc.add_table(rows=2, cols=2)
+        for sutun, (yol, baslik) in enumerate([
+            (baski, "BASILACAK OLAN — çerçeveli kareler boş bırakılır,\nindikatör oraya damlatılır"),
+            (ornek, "ÖRNEK — indikatör uygulanıp renk değiştikten sonraki görünüm\n(bu BASILMAZ)"),
+        ]):
+            h = tablo.cell(0, sutun).paragraphs[0]
+            h.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            hr = h.add_run(baslik)
+            hr.bold = True
+            hr.font.size = Pt(8)
+            g = tablo.cell(1, sutun).paragraphs[0]
+            g.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            g.add_run().add_picture(str(yol), width=Cm(etiket), height=Cm(etiket))
         alt = doc.add_paragraph()
         alt.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r = alt.add_run(f"{ad}  —  yukarıdaki renkli blokların her biri "
-                        f"yaklaşık {damla:.0f} mm")
+        r = alt.add_run(f"{ad}  —  çerçevelerin İÇİ ≈ {damla:.0f} mm "
+                        f"(damlanın sığması gereken alan)")
         r.font.size = Pt(8)
 
     doc.save(CIKTI)

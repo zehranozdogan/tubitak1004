@@ -68,7 +68,20 @@ def bloklari_sec(adaylar: list[tuple[int, int]], k: int, n: int, hedef: int) -> 
     return secili
 
 
-def ciz(qr, bloklar: list[tuple[int, int]], k: int, durum: str | None) -> Image.Image:
+def ciz(qr, bloklar: list[tuple[int, int]], k: int, durum: str | None,
+        baski: bool = False) -> Image.Image:
+    """[durum] None -> nötr gösterim, "spoiled" vb. -> örnek renk değişimi.
+
+    [baski] True ise BASKI USTASI çizilir: reaktif blokların İÇİ hiç
+    basılmaz (beyaz kâğıt kalır, indikatör oraya damlatılacak), yalnızca
+    bloğun bir modüllük ÇERÇEVESİ basılır. Çerçeve iki işe yarar:
+    operatör nereye damlatacağını görür, ve çerçeve zaten bloğun kendi
+    alanı içinde kaldığı için QR'a ek hasar vermez.
+
+    Gri nötr gösterim BASILMAMALIDIR: indikatör grinin üstüne damlarsa
+    renk kirlenir — profildeki referans renkler BEYAZ kâğıt üzerinde
+    tanımlı (kullanıcı tespiti, 13 Ekim).
+    """
     matris = module_matrix(qr)
     n = len(matris)
     boyut = (n + 2 * BORDER) * SCALE
@@ -83,7 +96,15 @@ def ciz(qr, bloklar: list[tuple[int, int]], k: int, durum: str | None) -> Image.
         for c in range(n):
             bit = matris[r][c]
             if (r, c) in reaktif:
-                renk = koyu if bit else acik
+                if baski:
+                    kenar = any(
+                        r in (r0, r0 + k - 1) or c in (c0, c0 + k - 1)
+                        for r0, c0 in bloklar
+                        if r0 <= r < r0 + k and c0 <= c < c0 + k
+                    )
+                    renk = (0, 0, 0) if kenar else (255, 255, 255)
+                else:
+                    renk = koyu if bit else acik
             else:
                 renk = (0, 0, 0) if bit else (255, 255, 255)
             x0, y0 = (c + BORDER) * SCALE, (r + BORDER) * SCALE
@@ -115,7 +136,8 @@ def main() -> None:
         for etiket in ETIKET_CM:
             modul_mm = etiket * 10 / (n + 2 * BORDER)
             for damla in DAMLA_MM:
-                k = math.ceil(damla / modul_mm)
+                # Çerçeve bir modül yer kaptığı için blok, damla + 2 modül olmalı
+                k = math.ceil(damla / modul_mm) + 2
                 if k > 8:
                     continue  # blok QR'ı yiyecek kadar büyük
                 bloklar = bloklari_sec(adaylar, k, n, HEDEF_BLOK)
@@ -126,17 +148,21 @@ def main() -> None:
                 if oran > 15:
                     continue  # ECC için fazla riskli
                 ad = f"{n}x{n}_{etiket:.0f}cm_damla{damla:.0f}mm"
-                notr = ciz(qr, bloklar, k, None)
+                baski = ciz(qr, bloklar, k, None, baski=True)
                 bozuk = ciz(qr, bloklar, k, "spoiled")
-                notr.save(CIKTI / f"{ad}_notr.png")
+                baski.save(CIKTI / f"{ad}_baski.png")
                 bozuk.save(CIKTI / f"{ad}_ornek.png")
-                ok = cozulebiliyor_mu(bozuk)
+                # İKİSİ de okunabilmeli: basılacak olan da, damlatılmış hâli de.
+                ok = cozulebiliyor_mu(baski) and cozulebiliyor_mu(bozuk)
+                ic_mm = (k - 2) * modul_mm  # çerçeve içi: damlanın sığacağı alan
+                if ic_mm < damla:
+                    continue  # çerçeve içi damla için yetersiz
                 satirlar.append((ad, pad, len(metin), n, etiket, modul_mm, damla, k,
-                                 k * modul_mm, len(bloklar), toplam, oran, ok))
+                                 ic_mm, len(bloklar), toplam, oran, ok))
 
     print(f"{len(satirlar)} seçenek üretildi -> {CIKTI}\n")
-    print("seçenek                     payload   QR     modül  blok  blok   alan  reaktif  QR")
-    print("                            (karakter)       (mm)   (k)   (mm)   sayı  (%)      okunur")
+    print("seçenek                     payload   QR     modül  blok  ÇERÇEVE  alan  reaktif  QR")
+    print("                            (karakter)       (mm)   (k)   İÇİ(mm)  sayı  (%)      okunur")
     for (ad, pad, uzn, n, etiket, mm, damla, k, blok_mm, nb, toplam, oran, ok) in satirlar:
         print(f"{ad:26} {uzn:4}      {n:2}x{n:<2}  {mm:4.2f}  {k}x{k}  {blok_mm:4.1f}  {nb:3}   "
               f"{oran:4.1f}     {'EVET' if ok else 'HAYIR'}")

@@ -65,10 +65,35 @@ etikette 5×5 blok = 3,4 mm oluyor ve QR hâlâ okunuyor (doğrulandı).
 Payload kısaltma blok başına daha az modül harcar ama şema değişikliği
 gerektirir — gerekmiyorsa yapılmamalı.
 
-**Üretilen seçenekler:** `tests/device/build_qr_options.py` 27 kombinasyon
-(payload uzunluğu × etiket boyutu × damla çapı) üretiyor ve her birinde
-QR'ın HÂLÂ ÇÖZÜLDÜĞÜNÜ doğruluyor (bir kombinasyon elendi: 33×33 / 5 cm /
-4 mm damla → reaktif alan %13,2 olunca QR okunmuyor).
+**REAKTİF ALANLAR BOŞ BASILMALI, ÇERÇEVELİ (13 Ekim, kullanıcı tespiti):**
+nötr gri gösterim BASILAMAZ — indikatör grinin üstüne damlarsa renk
+kirlenir (profildeki referans renkler BEYAZ kâğıt üzerinde tanımlı). Ama
+alan tamamen beyaz bırakılırsa operatör nereye damlatacağını göremez
+(QR'ın kendi beyaz modüllerinden ayırt edilemez).
+
+Çözüm: bloğun **içi boş (beyaz)**, **kenarı bir modül çerçeveli**. Çerçeve
+bloğun kendi alanında kaldığı için QR'a ek hasar vermiyor; damla çerçevenin
+içine gidiyor. Bu yüzden blok, damla çapı + 2 modül olmalı.
+
+Manuel damlatma, hizalama sorununu da ortadan kaldırıyor: alanlar artık
+0,68 mm'lik tek modüller değil, gözle görülüp elle hedeflenebilen 3–5 mm'lik
+çerçeveli kareler. Makine hizalaması (ve iki katmanlı baskı) gerekmiyor.
+
+**Üretilen seçenekler:** `tests/device/build_qr_options.py` kombinasyonları
+(payload uzunluğu × etiket boyutu × damla çapı) tarıyor, blokları çerçeveli
+ve içi boş çiziyor, ve HEM basılacak dosyanın HEM damlatılmış hâlin QR
+olarak çözülüp çözülmediğini doğruluyor. 26 seçenek üretildi; 33×33'ün
+çoğu elendi (çerçeveli bloklar küçük QR'ın %13'ünü aşınca okunmuyor).
+
+Mevcut payload biçimiyle (65×65) her damla çapı 5/7/10 cm'de çalışıyor:
+
+| Etiket | Damla 2 mm | Damla 3 mm | Damla 4 mm |
+|---|---|---|---|
+| 5 cm | 5×5 blok (%5,3) | 7×7 (%10,4) | 8×8 (%13,6) |
+| 7 cm | 5×5 (%5,3) | 6×6 (%7,7) | 7×7 (%10,4) |
+| 10 cm | 4×4 (%3,4) | 5×5 (%5,3) | 5×5 (%5,3) |
+
+(Yüzde = reaktif alanın QR'a oranı; hepsinde 9 blok, hepsi okunuyor.)
 
 Kimyaya gösterilmek üzere **gerçek boyutta basılabilir** dosya:
 `tests/device/QR_Tasarim_Secenekleri.docx` — cetvelle ölçülüp "damla bu
