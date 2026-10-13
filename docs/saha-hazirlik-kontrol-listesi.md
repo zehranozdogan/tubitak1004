@@ -102,6 +102,44 @@ bloğa sığar mı" sorusu doğrudan cevaplanabilir.
 **Karar için gereken tek bilgi:** kimya tarafının damlattığı hacim ve
 oluşan lekenin çapı (mm). O sayı gelince seçenek doğrudan belirlenir.
 
+### ⚠️ Damla tek renk basar — sentetik görseller ve sınıf-farkındalıklı okuma etkileniyor
+
+(13 Ekim, kullanıcı tespiti: "renk değişiminin altında da siyahlıklar var")
+
+Mevcut render, her reaktif hücreyi **durum rengi + QR biti** olarak
+basıyor: `STATE_COLORS` 6 profil noktasını "3 durum × açık/koyu ton" diye
+gruplayıp, hücrenin QR biti 1 ise koyu tonu, 0 ise açık tonu kullanıyor.
+
+**Elle damlatılan sıvı bunu üretemez.** Damla, altındaki QR desenini
+bilmez; bloğun tamamını **tek renge** boyar.
+
+| Konu | Mevcut varsayım | Manuel damlatmada gerçek |
+|---|---|---|
+| Reaktif alan | her hücre: durum rengi + QR biti | blok: tek renk, QR biti yok |
+| Okuyucu | açık/koyu sınıfları ayrı eşleştiriyor | ayrılacak sınıf yok |
+| Sentetik test görselleri | açık/koyu desenli | **gerçekçi değil** |
+
+**Etkilenmeyen:** profilin kendisi. 6 nokta bir derişim→renk eğrisidir
+(0,03125 … 1,0 mM) ve tek renkli ölçümle de geçerlidir — damla hangi
+derişimdeyse o rengi verir, okuyucu en yakın noktayı bulur.
+
+**Etkilenen üç şey:**
+
+1. **Sentetik durum görselleri** (`state_fresh/transition/spoiled.png`)
+   düz tek renkli bloklarla yeniden üretilmeli; şu anki desenli hâlleri
+   fiziksel olarak imkânsız bir etiketi taklit ediyor.
+2. **Sınıf-farkındalıklı okuma** (`sensorModuleBits`, açık/koyu ayrımı)
+   işlevsiz kalır — blok başına tek ölçüm olur. Sadeleşme, kayıp değil:
+   9 blok = aynı büyüklüğün 9 bağımsız ölçümü, medyanla birleştirilir.
+3. **Kalibrasyon karşılaştırması (0004)** yeniden düşünülmeli: A yöntemi
+   referanslarını QR'ın İÇİNDEKİ beyaz/siyah modüllerden alıyor, onlar
+   duruyor — ama ölçülen hücrelerin artık QR biti olmadığı için
+   A/B/C'nin göreli avantajları değişebilir.
+
+**DOĞRULANDI:** düz tek renkli bloklarla QR hâlâ okunuyor — 3×3'ten
+8×8'e (%1,9–%13,6 reaktif alan) taze/geçiş/bozuk üç renkte de başarılı.
+Yani kod çözme tarafında engel yok.
+
 ### ⚠️ LOD, profil ölçeğinin yarısını geçersiz kılıyor
 
 Putresin tespit sınırı **0,15 mM**. Mevcut profil noktaları:
