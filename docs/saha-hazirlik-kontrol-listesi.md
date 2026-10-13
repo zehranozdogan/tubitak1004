@@ -16,6 +16,85 @@ Aşağıdaki liste üç gruba ayrıldı: **(A) sahaya çıkmayı engelleyenler**
 
 ---
 
+## 📩 DANIŞMAN YANITLARI (13 Ekim) — gelen cevaplar ve doğurdukları işler
+
+Kaynak: "QR Tabanlı Balık Tazeliği – Teknik sorular, Sevgi Hocanın
+açıklamaları ve değerlendirilebilecek yöntemler".
+
+### ✅ Netleşenler
+
+| Konu | Gelen cevap |
+|---|---|
+| Sensör alanı nerede | **QR'ın İÇİNDE** kalacak. Dışarı taşıma yalnızca fiziksel uygulama/okunabilirlik sorun çıkarırsa alternatif. |
+| Reaktif tip sayısı | Şimdilik **tek QR'da tek tip** indikatör. |
+| Uygulama yöntemi | **Manuel damlatma.** Planlanan printer cihazı artık üretilmiyor, temin edilemedi. |
+| LOD değerleri | TMA 47 ppm (0,80 mM) · Histamin 66 ppm (0,594 mM) · **Putresin 0,15 mM (13 ppm)** |
+| Doğrulama | Nanofiber kâğıtlar üretiliyor; putresin/kadaverin/TMA/triamin/histamin testleri önümüzdeki haftalarda, sonra gerçek balıkta. |
+
+### 🔴 EN KRİTİK SONUÇ — mevcut QR tasarımı fiziksel olarak uygulanamaz
+
+> *"QR kodun iç tasarımının biraz daha basit olması, karelerin daha büyük
+> tutulması ve indikatörü manuel olarak damlatabileceğimiz uygun
+> büyüklükte alanlar oluşturulması gerekiyor."*
+
+Mevcut tasarım: QR v12, 65×65, **tek tek dağıtılmış 75 reaktif modül**.
+5 cm'lik etikette modül başına **0,68 mm** düşüyor. Elle damlatılan bir
+indikatör damlası kâğıtta ~2–4 mm yayılır — yani **bir damla, hedef
+hücresinin 3–6 katı alanı kaplar.** Dağıtılmış tek-modül tasarımı manuel
+uygulamayla mümkün değil.
+
+İki şey birden değişmeli:
+
+1. **QR sadeleşmeli** (payload kısaltılarak sürüm düşürülmeli) → modüller
+   büyür.
+2. **Reaktif hücreler bitişik bloklara gruplanmalı** (tek tek dağıtılmış
+   değil) → damlanın sığacağı alan oluşur.
+
+Ölçülen seçenekler (sessiz kenar dahil, tek blok kenar uzunluğu):
+
+| Payload | QR matrisi | Etiket 5 cm | Etiket 7 cm | Etiket 10 cm |
+|---|---|---|---|---|
+| mevcut (155 karakter) | 65×65 | 3×3 blok = 2,05 mm | 2,88 mm | 4,11 mm |
+| kısaltılmış (62 kr) | 45×45 | 2,83 mm | 3,96 mm | 5,66 mm |
+| çok kısa (28 kr) | 33×33 | **3,66 mm** | 5,12 mm | 7,32 mm |
+
+**Karar için gereken tek bilgi:** kimya tarafının damlattığı hacim ve
+oluşan lekenin çapı (mm). O sayı gelince yukarıdaki tablodan QR sürümü +
+etiket boyutu + blok ölçüsü doğrudan seçilebilir.
+
+### ⚠️ LOD, profil ölçeğinin yarısını geçersiz kılıyor
+
+Putresin tespit sınırı **0,15 mM**. Mevcut profil noktaları:
+
+| Nokta | Değer (mM) | LOD'un üstünde mi |
+|---|---|---|
+| P1 | 0,03125 | ❌ altında |
+| P2 | 0,0625 | ❌ altında |
+| P3 | 0,125 | ❌ altında |
+| P4 | 0,25 | ✅ |
+| P5 | 0,5 | ✅ |
+| P6 | 1,0 | ✅ |
+
+**İlk üç nokta tespit sınırının altında** — yani fiziksel olarak
+birbirinden ayırt edilemezler. Profil ölçeği, deney sonuçları gelince
+LOD'un üstünden başlayacak şekilde yeniden tanımlanmalı.
+
+### Diğer işler
+
+- **§7 — "Tüketilebilir" ifadesi onaylanmadı.** Sonuç ekranındaki tüketim
+  tavsiyeleri kaldırıldı (13 Ekim); metinler artık yalnızca ölçümün ne
+  gösterdiğini söylüyor, ne yapılacağını değil. Onay gelirse geri eklenir.
+- **§6 — çekim koşulları** için danışman da literatür tarayacak. Önerdiği
+  ölçütler (QR'ın kadrajdaki alanı, netlik, parlama, perspektif) bizim
+  kalite kapımızla örtüşüyor; sabit santimetre yerine bunlar kullanılabilir.
+- **§8 — veri saklama** kararı yok; cihazda yerel günlük yeterli görülüyor.
+  Önerilen kayıt alanlarından bizde **olmayanlar**: QR/maske sürümü ve
+  test-mi-gerçek-mi ayrımı.
+- **§5 — tutarsızlık notu:** e-postadaki LOD değerleri ile TÜBİTAK ara
+  raporundaki değerler örtüşmüyor; **e-posta güncel kabul edilecek.**
+
+---
+
 ## A. Sahaya çıkmayı ENGELLEYENLER
 
 ### A1. Tazelik eşikleri yok — uygulama sınıf üretemiyor
