@@ -91,6 +91,8 @@ def ciz(qr, bloklar: list[tuple[int, int]], k: int, durum: str | None,
     if durum is None:
         acik, koyu = NEUTRAL["light"], NEUTRAL["dark"]
     else:
+        # `acik`, o durumun profil noktası rengi — damlanın bloğa vereceği
+        # TEK renk olarak kullanılıyor (bkz. aşağıdaki "DÜZ TEK RENK" notu).
         acik, koyu = STATE_COLORS[durum]["light"], STATE_COLORS[durum]["dark"]
     for r in range(n):
         for c in range(n):
@@ -104,7 +106,11 @@ def ciz(qr, bloklar: list[tuple[int, int]], k: int, durum: str | None,
                     )
                     renk = (0, 0, 0) if kenar else (255, 255, 255)
                 else:
-                    renk = koyu if bit else acik
+                    # DÜZ TEK RENK (13 Ekim): elle damlatılan sıvı altındaki
+                    # QR desenini bilmez, bloğun tamamını tek renge boyar.
+                    # Önceki hâli hücre bazında açık/koyu basıyordu — fiziksel
+                    # olarak imkânsız bir etiketi taklit ediyordu.
+                    renk = acik
             else:
                 renk = (0, 0, 0) if bit else (255, 255, 255)
             x0, y0 = (c + BORDER) * SCALE, (r + BORDER) * SCALE
